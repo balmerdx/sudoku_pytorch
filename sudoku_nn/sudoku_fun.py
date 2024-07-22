@@ -86,8 +86,6 @@ class SudokuFilterHorizontalVertical(nn.Module):
 Ядро для сложения должно быть 9 в длинну и 1 в высоту.
 
 Потом имея эту маску мы стираем цифры для всех неопределённых.
-
-img.expand_as(other)
     '''
     def __init__(self, horizontal=True):
         super(SudokuFilterHorizontalVertical,self).__init__()
@@ -110,10 +108,44 @@ img.expand_as(other)
     def forward(self, mask : torch.Tensor, exact_cells : torch.Tensor) -> torch.Tensor:
         exact_cell_expanded = exact_cells.expand_as(mask)
         exact_mask = torch.mul(mask, exact_cell_expanded)
-        print(f"{exact_mask.shape=}")
+        #print(f"{exact_mask.shape=}")
 
         #маска элементов которые точно встречаются на этой строке
         sum_mask_elem = self.select_sum_conv(exact_mask).expand_as(mask)
+
+        #маска элементов которые надо оставить
+        sum_mask_pos = torch.mul(NNNot(sum_mask_elem), NNNot(exact_cell_expanded))
+        #на однозначно определённых местах всегда оставляем всё
+        sum_mask_pos = NNOr(sum_mask_pos, exact_cell_expanded)
+
+        return NNAnd(sum_mask_pos, mask)
+
+class SudokuFilterBox(nn.Module):
+    '''
+По аналогии с SudokuFilterHorizontalVertical мы стираем невозможые числа из box.
+Вместо нужно будет воспользоваться Conv2d kernel_size=3, stride=3
+И UpsamplingNearest2d вместо expand_as
+    '''
+    def __init__(self):
+        super(SudokuFilterBox,self).__init__()
+
+        self.select_sum_conv = nn.Conv2d(in_channels=9, out_channels=9, kernel_size=3, groups=9, stride=3)
+        self.select_sum_conv.weight = torch.nn.Parameter(torch.tensor([[[[1]*3]*3]]*9, dtype=torch.float32))
+        self.select_sum_conv.bias = torch.nn.Parameter(torch.zeros(9, dtype=torch.float32))
+        print(f"{self.select_sum_conv.weight.shape=}")
+        print(f"{self.select_sum_conv.bias.shape=}")
+        self.upsample3 = nn.UpsamplingNearest2d(scale_factor=3)
+
+    def forward(self, mask : torch.Tensor, exact_cells : torch.Tensor) -> torch.Tensor:
+        exact_cell_expanded = exact_cells.expand_as(mask)
+        exact_mask = torch.mul(mask, exact_cell_expanded)
+
+        #маска элементов которые точно встречаются на этой строке
+        sum_mask_elem = self.select_sum_conv(exact_mask)
+        #print(f"0 {sum_mask_elem.shape=}")
+        
+        sum_mask_elem = self.upsample3(sum_mask_elem)
+        #print(f"3 {sum_mask_elem.shape=}")
 
         #маска элементов которые надо оставить
         sum_mask_pos = torch.mul(NNNot(sum_mask_elem), NNNot(exact_cell_expanded))
