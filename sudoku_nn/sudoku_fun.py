@@ -5,6 +5,12 @@ import torch.nn as nn
 def NNOr(x,y):
     return torch.clamp(torch.fmax(x,y), 0, 1)
 
+def NNAnd(x,y):
+    return torch.clamp(torch.fmin(x,y), 0, 1)
+
+def NNNot(x):
+    return torch.sub(1, x)
+
 class ConvSudokuTextToBits(nn.Module):
     '''
 сконвертируем текстовое судоку из формата 
@@ -39,12 +45,72 @@ class ConvSudokuTextToBits(nn.Module):
         pass
 
     def forward(self, sudoku : torch.Tensor) -> torch.Tensor:
-        sudoku = self.sudoku_relu(torch.sub(sudoku, self.sub_zero_char))
-        input_zeros = self.zeros_relu(self.select_zero_conv(sudoku))
+        sudoku_sub = self.sudoku_relu(torch.sub(sudoku, self.sub_zero_char))
+        input_zeros = self.zeros_relu(self.select_zero_conv(sudoku_sub))
         input_zeros = self.zeros_repeat_conv(input_zeros)
 
-        select_number1 = self.select_number1_relu(self.select_number1_conv(sudoku))
-        select_number2 = self.select_number2_relu(self.select_number2_conv(sudoku))
+        select_number1 = self.select_number1_relu(self.select_number1_conv(sudoku_sub))
+        select_number2 = self.select_number2_relu(self.select_number2_conv(sudoku_sub))
 
         select_number = torch.mul(select_number1, select_number2)
         return NNOr(select_number, input_zeros)
+
+class SudokuNumbersInCell(nn.Module):
+    '''
+для каждого из прямоугольников смотрим на числа от 0..9 и если у нес есть одно и только одно число (или точнее number_to_compare),
+то выставляем 1. Впринципе всё элементарно - надо просуммировать и сравнить с number_to_compare.
+    '''
+    def __init__(self, number_to_compare=1.):
+        super(SudokuNumbersInCell,self).__init__()
+
+        self.select_number1_conv = nn.Conv2d(in_channels=9, out_channels=1, kernel_size=1)
+        self.select_number1_conv.weight = torch.nn.Parameter(torch.tensor([[[[1]]]*9], dtype=torch.float32))
+        self.select_number1_conv.bias = torch.nn.Parameter(torch.tensor([-number_to_compare+1], dtype=torch.float32))
+        self.select_number1_relu = nn.ReLU()
+
+        self.select_number2_conv = nn.Conv2d(in_channels=9, out_channels=1, kernel_size=1)
+        self.select_number2_conv.weight = torch.nn.Parameter(torch.tensor([[[[-1]]]*9], dtype=torch.float32))
+        self.select_number2_conv.bias = torch.nn.Parameter(torch.tensor([number_to_compare+1], dtype=torch.float32))
+        self.select_number2_relu = nn.ReLU()
+        pass
+
+    def forward(self, x : torch.Tensor) -> torch.Tensor:
+        select_number1 = self.select_number1_relu(self.select_number1_conv(x))
+        select_number2 = self.select_number2_relu(self.select_number2_conv(x))
+        return torch.mul(select_number1, select_number2)
+
+class SudokuRemoveHorizontal(nn.Module):
+    '''
+Берём точно определённые числа, находящихся на этой линии.
+Из них делаем маску чисел на линии. Для этого их достаточно сложить маски ConvSudokuTextToBits
+предварительно умножив на маску определённости.
+Ядро для сложения должно быть 9 в длинну и 1 в высоту.
+
+Потом имея эту маску мы стираем цифры для всех неопределённых.
+
+img.expand_as(other)
+    '''
+    def __init__(self):
+        super(SudokuRemoveHorizontal,self).__init__()
+        
+        self.select_sum_conv = nn.Conv2d(in_channels=9, out_channels=9, kernel_size=(1, 9), groups=9)
+        self.select_sum_conv.weight = torch.nn.Parameter(torch.tensor([[[[1]*9]]]*9, dtype=torch.float32))
+        self.select_sum_conv.bias = torch.nn.Parameter(torch.zeros(9, dtype=torch.float32))
+        print(f"{self.select_sum_conv.weight.shape=}")
+        print(f"{self.select_sum_conv.bias.shape=}")
+        
+
+    def forward(self, mask : torch.Tensor, exact_cells : torch.Tensor) -> torch.Tensor:
+        exact_cell_expanded = exact_cells.expand_as(mask)
+        exact_mask = torch.mul(mask, exact_cell_expanded)
+        print(f"{exact_mask.shape=}")
+
+        #маска элементов которые точно встречаются на этой строке
+        sum_mask_elem = self.select_sum_conv(exact_mask).expand_as(mask)
+
+        #маска элементов которые надо оставить
+        sum_mask_pos = torch.mul(NNNot(sum_mask_elem), NNNot(exact_cell_expanded))
+        #на однозначно определённых местах всегда оставляем всё
+        sum_mask_pos = NNOr(sum_mask_pos, exact_cell_expanded)
+
+        return NNAnd(sum_mask_pos, mask)
