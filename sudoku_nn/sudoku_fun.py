@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 
-
 def NNOr(x,y):
     return torch.clamp(torch.fmax(x,y), 0, 1)
 
@@ -79,7 +78,7 @@ class SudokuNumbersInCell(nn.Module):
         select_number2 = self.select_number2_relu(self.select_number2_conv(x))
         return torch.mul(select_number1, select_number2)
 
-class SudokuRemoveHorizontal(nn.Module):
+class SudokuFilterHorizontalVertical(nn.Module):
     '''
 Берём точно определённые числа, находящихся на этой линии.
 Из них делаем маску чисел на линии. Для этого их достаточно сложить маски ConvSudokuTextToBits
@@ -90,14 +89,22 @@ class SudokuRemoveHorizontal(nn.Module):
 
 img.expand_as(other)
     '''
-    def __init__(self):
-        super(SudokuRemoveHorizontal,self).__init__()
+    def __init__(self, horizontal=True):
+        super(SudokuFilterHorizontalVertical,self).__init__()
         
-        self.select_sum_conv = nn.Conv2d(in_channels=9, out_channels=9, kernel_size=(1, 9), groups=9)
-        self.select_sum_conv.weight = torch.nn.Parameter(torch.tensor([[[[1]*9]]]*9, dtype=torch.float32))
-        self.select_sum_conv.bias = torch.nn.Parameter(torch.zeros(9, dtype=torch.float32))
-        print(f"{self.select_sum_conv.weight.shape=}")
-        print(f"{self.select_sum_conv.bias.shape=}")
+        if horizontal:
+            self.select_sum_conv = nn.Conv2d(in_channels=9, out_channels=9, kernel_size=(1, 9), groups=9)
+            self.select_sum_conv.weight = torch.nn.Parameter(torch.tensor([[[[1]*9]]]*9, dtype=torch.float32))
+            self.select_sum_conv.bias = torch.nn.Parameter(torch.zeros(9, dtype=torch.float32))
+            #print(f"{self.select_sum_conv.weight.shape=}")
+            #print(f"{self.select_sum_conv.bias.shape=}")
+        else:
+            #vertical
+            self.select_sum_conv = nn.Conv2d(in_channels=9, out_channels=9, kernel_size=(9, 1), groups=9)
+            self.select_sum_conv.weight = torch.nn.Parameter(torch.tensor([[[[1]]*9]]*9, dtype=torch.float32))
+            self.select_sum_conv.bias = torch.nn.Parameter(torch.zeros(9, dtype=torch.float32))
+            #print(f"{self.select_sum_conv.weight.shape=}")
+            #print(f"{self.select_sum_conv.bias.shape=}")
         
 
     def forward(self, mask : torch.Tensor, exact_cells : torch.Tensor) -> torch.Tensor:

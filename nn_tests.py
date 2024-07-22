@@ -46,9 +46,10 @@ mask = conv_sudoku(input)
 conv_exact = SudokuNumbersInCell()
 mask_exact = conv_exact(mask)
 
-remove_h = SudokuRemoveHorizontal()
-mask_line = remove_h(mask, mask_exact)
-mask = mask_line
+remove_h = SudokuFilterHorizontalVertical(horizontal=True)
+remove_v = SudokuFilterHorizontalVertical(horizontal=False)
+mask = remove_h(mask, mask_exact)
+mask = remove_v(mask, mask_exact)
 
 ds = DrawSudoku()
 #ds.draw_sudoku(sudoku=sudoku.decode(), hints=mask)
