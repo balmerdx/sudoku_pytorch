@@ -59,7 +59,14 @@ class DrawSudoku:
     def show(self):
         import cv2
         cv2.imshow("Input", cv2.cvtColor(np.array(self.img), cv2.COLOR_BGR2RGB))
-        cv2.waitKey(0)
+
+        while True:
+            key = cv2.waitKey(0)
+            if key==27:
+                exit()
+            if key==225 or key==233: #skip alt shift
+                continue
+            break
 
     def draw_sudoku(self,
                     sudoku="8.........95.......76.........426798...571243...893165......916....3.487....1.532",

@@ -40,6 +40,7 @@ def draw():
 
 #sudoku = b'9...84.6.6.4..52.7.3..7..8.76...15...53.....1...4.96.31.5.26.9...2.4....8....371.' #easy
 sudoku = b".68..5.9.7...12..6...86...287....3...92...51...3....671...83...6..59...3.5.7..18." #medium
+#sudoku = b"........9..8.97.56..785.4..3..1........5.8........3..5..5.692..94.78.6..7........" #hard
 #sudoku = b"5..6....3.....3.2.9..2.7.8...8....32..43..9.5..9....688..7.2.5......4.7.7..9....6" #veryhard
 
 ds = DrawSudoku()
@@ -51,25 +52,30 @@ conv_sudoku = ConvSudokuTextToBits()
 mask = conv_sudoku(input)
 
 conv_exact = SudokuNumbersInCell()
-mask_exact = conv_exact(mask)
-
-remove_h = SudokuFilterHorizontalVertical(horizontal=True)
-remove_v = SudokuFilterHorizontalVertical(horizontal=False)
-remove_box = SudokuFilterBox()
+remove_h = SudokuFilterHVBox("h")
+remove_v = SudokuFilterHVBox("v")
+remove_box = SudokuFilterHVBox("box")
+uniq_h = SudokuUniqueHVBox("h")
+uniq_v = SudokuUniqueHVBox("v")
+uniq_box = SudokuUniqueHVBox("box")
 
 draw() 
 
 for _ in range(5):
+    mask_exact = conv_exact(mask)
     mask = remove_h(mask, mask_exact)
-    mask_exact = conv_exact(mask)
     draw()
+    mask_exact = conv_exact(mask)
     mask = remove_v(mask, mask_exact)
-    mask_exact = conv_exact(mask)
     draw()
+    mask_exact = conv_exact(mask)
     mask = remove_box(mask, mask_exact)
-    mask_exact = conv_exact(mask)
     draw()
-
+    mask = uniq_h(mask)
+    mask = uniq_v(mask)
+    mask = uniq_box(mask)
+    draw()
+ 
 pass
 
 #ds.draw_sudoku(sudoku=sudoku.decode(), hints=mask)
