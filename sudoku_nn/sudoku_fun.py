@@ -110,15 +110,11 @@ type = "h" | "v" | "box"
             self.select_sum_conv = nn.Conv2d(in_channels=9, out_channels=9, kernel_size=(1, 9), groups=9)
             self.select_sum_conv.weight = torch.nn.Parameter(torch.tensor([[[[1]*9]]]*9, dtype=torch.float32))
             self.select_sum_conv.bias = torch.nn.Parameter(torch.zeros(9, dtype=torch.float32))
-            #print(f"{self.select_sum_conv.weight.shape=}")
-            #print(f"{self.select_sum_conv.bias.shape=}")
         elif type=='v':
             #vertical
             self.select_sum_conv = nn.Conv2d(in_channels=9, out_channels=9, kernel_size=(9, 1), groups=9)
             self.select_sum_conv.weight = torch.nn.Parameter(torch.tensor([[[[1]]*9]]*9, dtype=torch.float32))
             self.select_sum_conv.bias = torch.nn.Parameter(torch.zeros(9, dtype=torch.float32))
-            #print(f"{self.select_sum_conv.weight.shape=}")
-            #print(f"{self.select_sum_conv.bias.shape=}")
         elif type=='box':
             #box
             self.use_upsample3 = True
@@ -126,18 +122,14 @@ type = "h" | "v" | "box"
             self.select_sum_conv.weight = torch.nn.Parameter(torch.tensor([[[[1]*3]*3]]*9, dtype=torch.float32))
             self.select_sum_conv.bias = torch.nn.Parameter(torch.zeros(9, dtype=torch.float32))
             self.upsample3 = nn.UpsamplingNearest2d(scale_factor=3)
-            #print(f"{self.select_sum_conv.weight.shape=}")
-            #print(f"{self.select_sum_conv.bias.shape=}")
             pass
         else:
             #unknown type
             assert 0
-        
 
     def forward(self, mask : torch.Tensor, exact_cells : torch.Tensor) -> torch.Tensor:
         exact_cell_expanded = exact_cells.expand_as(mask)
         exact_mask = torch.mul(mask, exact_cell_expanded)
-        #print(f"{exact_mask.shape=}")
 
         #маска элементов которые точно встречаются на этой строке
         sum_mask_elem = self.select_sum_conv(exact_mask)
@@ -222,12 +214,57 @@ class  SudokuUniqueHVBox(nn.Module):
 
         #return NNAnd(sum_mask_pos, mask)
 
+class  SudokuIsEqual(nn.Module):
+    def __init__(self):
+        super(SudokuIsEqual,self).__init__()
+        #self.pool = nn.MaxPool2d(kernel_size=9)
+        self.sum_all = nn.Conv2d(in_channels=9, out_channels=1, kernel_size=9)
+        print(f"{self.sum_all.weight.shape=}")
+        print(f"{self.sum_all.bias.shape=}")
+        self.sum_all.weight = torch.nn.Parameter(torch.tensor([[[[1]*9]*9]*9], dtype=torch.float32))
+        self.sum_all.bias = torch.nn.Parameter(torch.zeros(1, dtype=torch.float32))
+
+    def forward(self, mask1 : torch.Tensor, mask2 : torch.Tensor) -> torch.Tensor:
+        return self.sum_all(torch.abs(torch.sub(mask1, mask2)))
+
 '''
-Класс, который проверяет, что sudoku решилось, либо нет возможности решить.
+Если число в box находится исключительно в одном из horizontal, vertical кусков, то значит его можно вычищать из остальных блоков.
+Например мы хотим это для горизонтального случая сделать.
+Т.е. нам надо будет пройтись по всем трём строкам и определить какие числа там находятся.
+Потом у нас будет условие - что число находится в одной строке, но его нет в других. Это получается 3 условия
+Имея такую маску мы можем её инвертировать и пройтись по другим box в этой строке.
 '''
 
 '''
-3 класса, которые проверяют (для horizontal, vertical, box). Если есть две ячейки в которых 2 одинаковых числа (и кроме них нет ничего),
+Тестовая фича. Если шаг фильтрации ничего не дал, то пропускать его.
+'''
+
+'''
+Класс, который проверяет в horizontal, vertical, box. Если есть две ячейки в которых 2 одинаковых числа,
 то в этом случае значит в других ячейках этих чисел нет.
-Возможно позволить решать hard?
+
+- считаем количество повторений в horizontal, vertical, box. Нам нужны числа, у которых 2 повторения.
+  и вот тут возникает сложность, что делать дальше?
+  Перебирать все комбинации слишком долго. Хотя может и не долго 8*7/2 = 28 комбинаций.
+  Это можно себе позволить пока у нас всего 9 чисел.
+  Для каждой из комбинаций 1+2, 1+3 .. 8+9 смотрим, что:
+   - соответствующих чисел только 2
+   - что они находятся в одной и той-же ячейке
+  Используя эту маску очищаем все остальные цифры в этой ячейке.
+  Далее используя эту маску можно очищать цифры вне этой ячейки.
+'''
+
+'''
+В отдельном тестовом проекте попробовать сделать упаковку массива с кучей нулевых элементов.
+Задача примерно такая у нас есть массив признаков пусто/полно + дополнительные данные.
+Полные признаки надо скинуть в начало массива.
+'''
+
+'''
+Класс, который проверяет (для horizontal, vertical). Если есть 3 ячейки в которых 3 одинаковых числа (и кроме них нет ничего),
+то в этом случае значит в других ячейках этих чисел нет.
+'''
+
+'''
+Класс, который проверяет, что sudoku решилось, либо нет возможности решить.
 '''

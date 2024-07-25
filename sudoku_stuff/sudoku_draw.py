@@ -2,7 +2,7 @@ from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 
 class DrawSudoku:
-    def __init__(self):
+    def __init__(self, enable_store_images=False):
         self.cell_size = 3*24
         self.line_width = 1
         self.line_width2 = 2
@@ -10,6 +10,8 @@ class DrawSudoku:
         self.big_font = ImageFont.truetype("/usr/share/fonts/truetype/ubuntu/UbuntuMono-R.ttf", size=self.cell_size)
         self.small_font = ImageFont.truetype("/usr/share/fonts/truetype/ubuntu/UbuntuMono-R.ttf", size=self.cell_size//3)
         self.img = Image.new("RGB", (self.image_size, self.image_size))
+        #список в которых сохраняем все изображения.
+        self.store_all_images=[] if enable_store_images else None
 
     def make_grid(self):
         d = ImageDraw.Draw(self.img)
@@ -56,14 +58,19 @@ class DrawSudoku:
         import matplotlib.pyplot as plt
         plt.imshow(self.img)
         plt.show()
-    def show(self):
+    def show(self, name="Input"):
         import cv2
-        cv2.imshow("Input", cv2.cvtColor(np.array(self.img), cv2.COLOR_BGR2RGB))
+        cv2.imshow(name, cv2.cvtColor(np.array(self.img), cv2.COLOR_BGR2RGB))
 
         while True:
             key = cv2.waitKey(0)
             if key==27:
                 exit()
+            if key==ord('g'):
+                self.save_gif()
+                exit()
+            if key==ord('s'):
+                self.store_all_images[-1].save(f"img{len(self.store_all_images)}.png")
             if key==225 or key==233: #skip alt shift
                 continue
             break
@@ -137,7 +144,14 @@ class DrawSudoku:
                     s = str(j+1)
                     _,_, tw, th = d.textbbox((0,0), s, font=self.small_font)
                     d.text((sm_cx+(sc-tw)//2, sm_cy+(sc-th)//2+offsety_sm), s, fill=(0,0,0), font=self.small_font)
+        if not (self.store_all_images is None):
+            self.store_all_images.append(self.img.copy())
         pass
+
+    def save_gif(self, filename="out.gif"):
+        assert not(self.store_all_images is None)
+        self.store_all_images[0].save(fp=filename, format='GIF', append_images=self.store_all_images[1:],
+             save_all=True, duration=500, loop=0)
 
 if __name__ == "__main__":
     hints = np.random.randint(low=0, high=2, size=(9,9,9), dtype=np.uint8)
