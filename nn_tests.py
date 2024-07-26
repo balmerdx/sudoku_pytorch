@@ -62,6 +62,7 @@ uniq_h = SudokuUniqueHVBox("h")
 uniq_v = SudokuUniqueHVBox("v")
 uniq_box = SudokuUniqueHVBox("box")
 sudoku_equal = SudokuIsEqual()
+digits_in_one_line_at_box_h = SudokuDigitsInOneLineAtBox()
 
 draw() 
 
@@ -91,6 +92,12 @@ for idx in range(10):
     mask = uniq_v(mask)
     mask = uniq_box(mask)
     draw(f"uniq_h uniq_v uniq_box {idx}")
+
+    new_mask = digits_in_one_line_at_box_h(mask)
+    is_equal = sudoku_equal(new_mask, mask)
+    mask = new_mask
+    if is_equal.item() > 0:
+        draw(f"digits_in_one_line_at_box_h  {idx}")
  
 pass
 

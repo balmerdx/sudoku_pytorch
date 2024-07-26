@@ -217,7 +217,6 @@ class  SudokuUniqueHVBox(nn.Module):
 class  SudokuIsEqual(nn.Module):
     def __init__(self):
         super(SudokuIsEqual,self).__init__()
-        #self.pool = nn.MaxPool2d(kernel_size=9)
         self.sum_all = nn.Conv2d(in_channels=9, out_channels=1, kernel_size=9)
         print(f"{self.sum_all.weight.shape=}")
         print(f"{self.sum_all.bias.shape=}")
@@ -227,13 +226,49 @@ class  SudokuIsEqual(nn.Module):
     def forward(self, mask1 : torch.Tensor, mask2 : torch.Tensor) -> torch.Tensor:
         return self.sum_all(torch.abs(torch.sub(mask1, mask2)))
 
-'''
-Если число в box находится исключительно в одном из horizontal, vertical кусков, то значит его можно вычищать из остальных блоков.
+class SudokuDigitsInOneLineAtBox(nn.Module):
+    '''
+Если число в box находится исключительно в одном из horizontal, vertical кусков box, то значит его можно вычищать из остальных boc.
 Например мы хотим это для горизонтального случая сделать.
 Т.е. нам надо будет пройтись по всем трём строкам и определить какие числа там находятся.
 Потом у нас будет условие - что число находится в одной строке, но его нет в других. Это получается 3 условия
 Имея такую маску мы можем её инвертировать и пройтись по другим box в этой строке.
-'''
+    '''
+    def __init__(self):
+        super(SudokuDigitsInOneLineAtBox,self).__init__()
+        #horizontal
+        self.pool_line = nn.MaxPool2d(kernel_size=(1,3))
+        self.select_sum_opposite = nn.Conv2d(in_channels=9, out_channels=9, kernel_size=(3, 1), groups=9, stride=(3,1))
+        self.select_sum_opposite.weight = torch.nn.Parameter(torch.tensor([[[[-1]]*3]]*9, dtype=torch.float32))
+        self.select_sum_opposite.bias = torch.nn.Parameter(torch.tensor([2]*9, dtype=torch.float32))
+        self.pool_opposite = nn.MaxPool2d(kernel_size=(1,3))
+        self.upsample_opposite = nn.UpsamplingNearest2d(scale_factor=(3,1))
+        self.upsample_negate = nn.UpsamplingNearest2d(scale_factor=(1,3))
+
+
+    def forward(self, mask : torch.Tensor) -> torch.Tensor:
+        #маска для каждой линии в box.
+        #у нас есть тройки чисел. Если два нулевых, а одно единичное, то это требуемая нам маска
+        #просуммируем по этой оси и сравним с 1. 0 во всех трёх значениях теоретически не может быть.
+        #это значит, что судоку не решаемо.
+        #line_mask.shape=(1,9,9,3)
+        line_mask = self.pool_line(mask)
+        #oposite_mask единичная, если у нас есть только одна строка с этим числом
+        #oposite_mask.shape=(1,9,3,3)
+        oposite_mask = nn.functional.relu(self.select_sum_opposite(line_mask))
+        oposite_mask_upsampled = self.upsample_opposite(oposite_mask)
+        #print(f"{oposite_mask_upsampled.shape=}")
+
+        #фильтруем, теперь в line_mask единичные только те линии, которые уникальны
+        line_mask = NNAnd(line_mask, oposite_mask_upsampled)
+
+        #negate_mask маска ячеек, в которых надо стирать соответствующие цифры
+        negate_mask_max = self.pool_opposite(line_mask).expand_as(line_mask)
+        negate_mask = NNAnd(negate_mask_max, NNNot(line_mask))
+        #print(f"{negate_mask.shape=}")
+        negate_mask_upsampled = self.upsample_negate(negate_mask)
+        #print(f"{negate_mask_upsampled.shape=}")
+        return NNAnd(mask, NNNot(negate_mask_upsampled))
 
 '''
 Тестовая фича. Если шаг фильтрации ничего не дал, то пропускать его.
