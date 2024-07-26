@@ -98,7 +98,7 @@ class DrawSudoku:
 
         if use_prev_hints and (self.prev_hints is None):
             use_prev_hints = False
-        prev_color = (prev_intensity,prev_intensity,prev_intensity)
+        prev_color = (0,prev_intensity,0)
 
         def is_hints(cell_hints):
             is_resolved_ = False
