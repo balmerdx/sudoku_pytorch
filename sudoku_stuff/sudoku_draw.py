@@ -12,6 +12,7 @@ class DrawSudoku:
         self.img = Image.new("RGB", (self.image_size, self.image_size))
         #список в которых сохраняем все изображения.
         self.store_all_images=[] if enable_store_images else None
+        self.prev_hints = None
 
     def make_grid(self):
         d = ImageDraw.Draw(self.img)
@@ -58,12 +59,12 @@ class DrawSudoku:
         import matplotlib.pyplot as plt
         plt.imshow(self.img)
         plt.show()
-    def show(self, name="Input"):
+    def show(self, name="Input", time_msec=0):
         import cv2
         cv2.imshow(name, cv2.cvtColor(np.array(self.img), cv2.COLOR_BGR2RGB))
 
         while True:
-            key = cv2.waitKey(0)
+            key = cv2.waitKey(time_msec)
             if key==27:
                 exit()
             if key==ord('g'):
@@ -77,7 +78,10 @@ class DrawSudoku:
 
     def draw_sudoku(self,
                     sudoku="8.........95.......76.........426798...571243...893165......916....3.487....1.532",
-                    hints=None):
+                    hints=None,
+                    use_prev_hints=True,
+                    store_prev_hints=True,
+                    prev_intensity=192):
         '''
         hints = это массив из 0 и 1. Всё что не ноль считаем единицей.
         там 3 индекса. Нулевой - y, первый - x, второй - 9 значений 0 или 1 в пределах ячейки.
@@ -90,7 +94,30 @@ class DrawSudoku:
             assert(len(hints.shape)==3)
             assert(hints.shape[0]==9) #y
             assert(hints.shape[1]==9) #x
-            assert(hints.shape[2]==9) 
+            assert(hints.shape[2]==9)
+
+        if use_prev_hints and (self.prev_hints is None):
+            use_prev_hints = False
+        prev_color = (prev_intensity,prev_intensity,prev_intensity)
+
+        def is_hints(cell_hints):
+            is_resolved_ = False
+            is_partial_ = False
+            is_invalid_ = False
+
+            hint_sum = 0
+            for hi in range(9):
+                hint_sum += 1 if cell_hints[hi] else 0
+            if hint_sum==1:
+                for hi in range(9):
+                    if cell_hints[hi]:
+                        is_resolved_ = str(hi+1)
+            else:
+                is_invalid_ = hint_sum==0
+                is_partial_ = not is_invalid_ and not (hint_sum==9)
+            return is_resolved_, is_partial_, is_invalid_
+
+
         self.make_grid()
 
         offsety_big = -8
@@ -110,19 +137,19 @@ class DrawSudoku:
             is_invalid = False
 
             cell_hints = None
+            prev_cell_hints = None
             if not s.isdigit() and not(hints is None):
-                hint_sum = 0
                 cell_hints = hints[y,x,:]
-                for hi in range(9):
-                    hint_sum += 1 if cell_hints[hi] else 0
-                if hint_sum==1:
-                    is_resolved = True
-                    for hi in range(9):
-                        if cell_hints[hi]:
-                            s = str(hi+1)
+                is_resolved, is_partial, is_invalid = is_hints(cell_hints)
+                if use_prev_hints:
+                    prev_cell_hints = self.prev_hints[y,x,:]
+                    is_resolved_p, is_partial_p, is_invalid_p = is_hints(prev_cell_hints)
+                    if is_resolved and is_resolved_p:
+                        s = is_resolved
+                    is_partial = is_partial or is_partial_p
                 else:
-                    is_invalid = hint_sum==0
-                    is_partial = not is_invalid and not (hint_sum==9)
+                    if is_resolved:
+                        s = is_resolved
 
             if s.isdigit():
                 if not is_resolved:
@@ -137,21 +164,31 @@ class DrawSudoku:
                 #draw small
                 sc = self.cell_size//3
                 for j in range(9):
-                    if not cell_hints[j]:
-                        continue
+                    color = (0,0,0)
+                    if prev_cell_hints is None:
+                        if not cell_hints[j]:
+                            continue
+                    else:
+                        if not cell_hints[j] and prev_cell_hints[j]:
+                            color = prev_color
+                        if not cell_hints[j] and not prev_cell_hints[j]:
+                            continue
                     sm_cx = cx + sc*(j%3)
                     sm_cy = cy + sc*(j//3)
                     s = str(j+1)
                     _,_, tw, th = d.textbbox((0,0), s, font=self.small_font)
-                    d.text((sm_cx+(sc-tw)//2, sm_cy+(sc-th)//2+offsety_sm), s, fill=(0,0,0), font=self.small_font)
+                    d.text((sm_cx+(sc-tw)//2, sm_cy+(sc-th)//2+offsety_sm), s, fill=color, font=self.small_font)
         if not (self.store_all_images is None):
             self.store_all_images.append(self.img.copy())
+
+        if not(hints is None) and store_prev_hints:
+            self.prev_hints = np.copy(hints)
         pass
 
     def save_gif(self, filename="out.gif"):
         assert not(self.store_all_images is None)
         self.store_all_images[0].save(fp=filename, format='GIF', append_images=self.store_all_images[1:],
-             save_all=True, duration=500, loop=0)
+             save_all=True, duration=300, loop=0)
 
 if __name__ == "__main__":
     hints = np.random.randint(low=0, high=2, size=(9,9,9), dtype=np.uint8)
