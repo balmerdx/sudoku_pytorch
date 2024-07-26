@@ -234,16 +234,32 @@ class SudokuDigitsInOneLineAtBox(nn.Module):
 Потом у нас будет условие - что число находится в одной строке, но его нет в других. Это получается 3 условия
 Имея такую маску мы можем её инвертировать и пройтись по другим box в этой строке.
     '''
-    def __init__(self):
+    def __init__(self, type):
         super(SudokuDigitsInOneLineAtBox,self).__init__()
-        #horizontal
-        self.pool_line = nn.MaxPool2d(kernel_size=(1,3))
-        self.select_sum_opposite = nn.Conv2d(in_channels=9, out_channels=9, kernel_size=(3, 1), groups=9, stride=(3,1))
-        self.select_sum_opposite.weight = torch.nn.Parameter(torch.tensor([[[[-1]]*3]]*9, dtype=torch.float32))
-        self.select_sum_opposite.bias = torch.nn.Parameter(torch.tensor([2]*9, dtype=torch.float32))
-        self.pool_opposite = nn.MaxPool2d(kernel_size=(1,3))
-        self.upsample_opposite = nn.UpsamplingNearest2d(scale_factor=(3,1))
-        self.upsample_negate = nn.UpsamplingNearest2d(scale_factor=(1,3))
+        
+        if type=='h':
+            #horizontal
+            self.pool_line = nn.MaxPool2d(kernel_size=(1,3))
+            self.select_sum_opposite = nn.Conv2d(in_channels=9, out_channels=9, kernel_size=(3,1), groups=9, stride=(3,1))
+            self.select_sum_opposite.weight = torch.nn.Parameter(torch.tensor([[[[-1]]*3]]*9, dtype=torch.float32))
+            self.select_sum_opposite.bias = torch.nn.Parameter(torch.tensor([2]*9, dtype=torch.float32))
+            self.pool_opposite = nn.MaxPool2d(kernel_size=(1,3))
+            self.upsample_opposite = nn.UpsamplingNearest2d(scale_factor=(3,1))
+            self.upsample_negate = nn.UpsamplingNearest2d(scale_factor=(1,3))
+        elif type=='v':
+            #vertical
+            self.pool_line = nn.MaxPool2d(kernel_size=(3,1))
+            self.select_sum_opposite = nn.Conv2d(in_channels=9, out_channels=9, kernel_size=(1,3), groups=9, stride=(1,3))
+            #print(f"{self.select_sum_opposite.weight.shape=}")
+            self.select_sum_opposite.weight = torch.nn.Parameter(torch.tensor([[[[-1]*3]]]*9, dtype=torch.float32))
+            #print(f"{self.select_sum_opposite.weight.shape=}")
+            self.select_sum_opposite.bias = torch.nn.Parameter(torch.tensor([2]*9, dtype=torch.float32))
+            self.pool_opposite = nn.MaxPool2d(kernel_size=(3,1))
+            self.upsample_opposite = nn.UpsamplingNearest2d(scale_factor=(1,3))
+            self.upsample_negate = nn.UpsamplingNearest2d(scale_factor=(3,1))
+        else:
+            assert False
+
 
 
     def forward(self, mask : torch.Tensor) -> torch.Tensor:
