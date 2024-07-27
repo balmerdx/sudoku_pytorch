@@ -1,6 +1,18 @@
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 
+import torch
+def mask_to_np(mask):
+    if isinstance(mask, torch.Tensor):
+        assert mask.shape[0]==1
+        assert mask.shape[1]==1 or mask.shape[1]==9
+        assert mask.shape[2]==9
+        assert mask.shape[3]==9
+        if mask.shape[1]==1:
+            mask = mask.expand((1,9,9,9))
+        return torch.squeeze(mask, 0).permute(1,2,0).detach().numpy()
+    return mask
+
 class DrawSudoku:
     def __init__(self, enable_store_images=False):
         self.cell_size = 3*24
@@ -76,12 +88,33 @@ class DrawSudoku:
                 continue
             break
 
+    def _draw_back_mask(self, draw : ImageDraw.ImageDraw, back_mask, color):
+        if back_mask is None:
+            return
+        back_mask = mask_to_np(back_mask)
+        sc = self.cell_size//3
+        for y in range(9):
+            for x in range(9):
+                cx, cy = self.cell_pos(x,y)
+                cell_hints = back_mask[y,x,:]
+                for j in range(9):
+                    if not cell_hints[j]:
+                        continue
+                    sm_cx = cx + sc*(j%3)
+                    sm_cy = cy + sc*(j//3)
+                    draw.rectangle((sm_cx+1, sm_cy+1, sm_cx+sc-2, sm_cy+sc-2), fill=color)
+                    pass
+        pass
+
     def draw_sudoku(self,
                     sudoku="8.........95.......76.........426798...571243...893165......916....3.487....1.532",
                     hints=None,
                     use_prev_hints=True,
                     store_prev_hints=True,
-                    prev_intensity=192):
+                    prev_intensity=192,
+                    back_mask = None,
+                    back_mask_color = (100,255,100,128)
+                    ):
         '''
         hints = это массив из 0 и 1. Всё что не ноль считаем единицей.
         там 3 индекса. Нулевой - y, первый - x, второй - 9 значений 0 или 1 в пределах ячейки.
@@ -120,9 +153,10 @@ class DrawSudoku:
 
         self.make_grid()
 
+
         offsety_big = -8
         offsety_sm = -2
-        d = ImageDraw.Draw(self.img)
+        d = ImageDraw.Draw(self.img, "RGBA")
         for i in range(81):
             if sudoku is None:
                 s = "."
@@ -178,6 +212,7 @@ class DrawSudoku:
                     s = str(j+1)
                     _,_, tw, th = d.textbbox((0,0), s, font=self.small_font)
                     d.text((sm_cx+(sc-tw)//2, sm_cy+(sc-th)//2+offsety_sm), s, fill=color, font=self.small_font)
+        self._draw_back_mask(d, back_mask, back_mask_color)
         if not (self.store_all_images is None):
             self.store_all_images.append(self.img.copy())
 
@@ -189,6 +224,27 @@ class DrawSudoku:
         assert not(self.store_all_images is None)
         self.store_all_images[0].save(fp=filename, format='GIF', append_images=self.store_all_images[1:],
              save_all=True, duration=300, loop=0)
+        
+def hints_to_str(hints):
+    hints = mask_to_np(hints)
+
+    assert(len(hints.shape)==3)
+    assert(hints.shape[0]==9) #y
+    assert(hints.shape[1]==9) #x
+    assert(hints.shape[2]==9)
+    arr = bytearray(('.'*81).encode())
+    for i in range(81):
+        x = i%9
+        y = i//9
+        cell_hints = hints[y,x,:]
+        hint_sum = 0
+        for hi in range(9):
+            hint_sum += 1 if cell_hints[hi] else 0
+        if hint_sum==1:
+            for hi in range(9):
+                if cell_hints[hi]:
+                    arr[i] = hi+ord('1')
+    return bytes(arr)
 
 if __name__ == "__main__":
     hints = np.random.randint(low=0, high=2, size=(9,9,9), dtype=np.uint8)

@@ -12,9 +12,10 @@ def NNNot(x):
 
 def NNCompare(x, value):
     #зануляем числа меньше x
-    x = nn.functional.relu(torch.sub(x, -value+1))
+    a = nn.functional.relu(torch.add(x, -value+1))
+    b = nn.functional.relu(torch.sub(value+1, x))
     #зануляем числа больше x
-    return nn.functional.relu(torch.sub(value+1, x))
+    return torch.fmin(a,b)
 
 
 class ConvSudokuTextToBits(nn.Module):
@@ -180,7 +181,7 @@ class  SudokuUniqueHVBox(nn.Module):
         sum_mask_elem = self.sum_downsample.downsample(mask)
         #маска элементов которые встречаются на этой строке только один раз
         uniq_mask_elem = NNCompare(sum_mask_elem, 1)
-        
+
         uniq_mask_elem = self.sum_downsample.upsample(uniq_mask_elem)
 
         #выделяем ячейки в которых нет таких чисел
@@ -261,7 +262,8 @@ class SudokuDigitsInOneLineAtBox(nn.Module):
         negate_mask_upsampled = self.upsample_negate(negate_mask)
         return NNAnd(mask, NNNot(negate_mask_upsampled))
 
-'''
+class SudokuDigitsDoubles(nn.Module):
+    '''
 Класс, который проверяет в horizontal, vertical, box. Если есть две ячейки в которых 2 одинаковых числа,
 то в этом случае значит в других ячейках этих чисел нет.
 
@@ -283,7 +285,19 @@ class SudokuDigitsInOneLineAtBox(nn.Module):
   - Суммируя всё по h/v/box мы можем узнать, что таких элементов ровно 2.
     делаем UpsamplingNearest2d и фильтруем получившиеся 36 каналов для каждой ячейки
   - потом эти значения можно отфильтровать из всех оставшися в h/v/box элементов
-'''
+    '''
+    def __init__(self, type):
+        super(SudokuDigitsDoubles,self).__init__()
+        self.sum_downsample = SudokuSumDownsample(type)
+        self.sum_permutations = nn.Conv2d(in_channels=9, out_channels=36, kernel_size=1)
+
+    def forward(self, mask : torch.Tensor) -> torch.Tensor:
+        #сумма, сколько раз элементы встречаются на этой h/v/box
+        sum_mask_elem = self.sum_downsample.downsample(mask)
+        #маска элементов которые встречаются на этой h/v/box два раза
+        two_mask_elem = NNCompare(sum_mask_elem, 2)
+        two_mask_elem = self.sum_downsample.upsample(two_mask_elem)
+        return two_mask_elem
 
 '''
 В отдельном тестовом проекте попробовать сделать упаковку массива с кучей нулевых элементов.

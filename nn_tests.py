@@ -30,17 +30,14 @@ print(f"{x.shape=} -> {y.shape=}")
 exit()
 '''
 
-def mask_to_np(mask):
-    return torch.squeeze(mask, 0).permute(1,2,0).detach().numpy()
-
-def draw(name="Initial"):
+def draw(name="Initial", back_mask=None):
     print(name)
     if not(ds.prev_hints is None):
-        ds.draw_sudoku(sudoku=sudoku.decode(), hints=mask_to_np(mask), store_prev_hints=False, prev_intensity=128)
+        ds.draw_sudoku(sudoku=sudoku.decode(), hints=mask_to_np(mask), store_prev_hints=False, prev_intensity=128, back_mask=back_mask)
         ds.show(time_msec=300)
-        ds.draw_sudoku(sudoku=sudoku.decode(), hints=mask_to_np(mask), store_prev_hints=False, prev_intensity=192)
+        ds.draw_sudoku(sudoku=sudoku.decode(), hints=mask_to_np(mask), store_prev_hints=False, prev_intensity=192, back_mask=back_mask)
         ds.show(time_msec=300)
-    ds.draw_sudoku(sudoku=sudoku.decode(), hints=mask_to_np(mask), store_prev_hints=True, use_prev_hints=False)
+    ds.draw_sudoku(sudoku=sudoku.decode(), hints=mask_to_np(mask), store_prev_hints=True, use_prev_hints=False, back_mask=back_mask)
     ds.show()
 
 def get_puzzle(filename="data/puzzles0_kaggle", idx=None):
@@ -56,7 +53,7 @@ def get_puzzle(filename="data/puzzles0_kaggle", idx=None):
         else:
             ri = idx
         print("get_puzzle", filename, ri)
-        for i in range(ri):
+        for _ in range(ri):
             line = f.readline()
         line = line.strip()
         print(line)
@@ -72,7 +69,8 @@ def get_puzzle(filename="data/puzzles0_kaggle", idx=None):
 #sudoku = b"5..6....3.....3.2.9..2.7.8...8....32..43..9.5..9....688..7.2.5......4.7.7..9....6" #veryhard
 #sudoku = b"8.........95.......76.........426798...571243...893165......916....3.487....1.532" #puzzles7_serg_benchmark extra hard
 #sudoku = b'.................1.....2.34.....4.....5...6....6.3.....3..6.....7..5.8..24......7' #data/puzzles2_17_clue 19 требуется двойка одинаковых чисел
-sudoku = get_puzzle("data/puzzles2_17_clue")
+sudoku = b'........6.....6..1.675.29347.26.43953.572.6484.6.3517253826741967.45.82324....567' #data/puzzles2_17_clue 19 до состояния кода требуется двойка
+#sudoku = get_puzzle("data/puzzles2_17_clue")
 
 ds = DrawSudoku(enable_store_images=True)
 input = np.frombuffer(sudoku, dtype=np.int8)
@@ -92,6 +90,7 @@ uniq_box = SudokuUniqueHVBox("box")
 sudoku_equal = SudokuIsEqual()
 digits_in_one_line_at_box_h = SudokuDigitsInOneLineAtBox("h")
 digits_in_one_line_at_box_v = SudokuDigitsInOneLineAtBox("v")
+doubles_v = SudokuDigitsDoubles("v")
 
 draw() 
 
@@ -124,8 +123,15 @@ for idx in range(10):
     mask = uniq_h(mask)
     mask = uniq_v(mask)
     mask = uniq_box(mask)
-    draw(f"uniq_h uniq_v uniq_box {idx}")
 
+    test_hints = doubles_v(mask)
+    #test_hints_np = np.zeros(shape=(1,9,9,9))
+    #test_hints_np[0,0,0,0] = 1.
+    #test_hints = torch.Tensor(test_hints_np)
+
+
+    draw(f"uniq_h uniq_v uniq_box {idx}", test_hints)
+    print(hints_to_str(mask))
     
     new_mask = digits_in_one_line_at_box_h(mask)
     is_equal = sudoku_equal(new_mask, mask)
