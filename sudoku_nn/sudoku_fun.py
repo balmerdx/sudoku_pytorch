@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import numpy as np
 
 def NNOr(x,y):
     return torch.clamp(torch.fmax(x,y), 0, 1)
@@ -93,25 +94,27 @@ class SudokuSumDownsample:
     Уменьшает элементы но горизонтали/вертикали/box3x3 и суммирует.
     Потом можно обратно увеличить.
     '''
-    def __init__(self, type : str):
+    def __init__(self, type : str, channels=9):
         if type=='h':
             #horizontal
-            self.select_sum_conv = nn.Conv2d(in_channels=9, out_channels=9, kernel_size=(1, 9), groups=9)
-            self.select_sum_conv.weight = torch.nn.Parameter(torch.tensor([[[[1]*9]]]*9, dtype=torch.float32))
-            self.select_sum_conv.bias = torch.nn.Parameter(torch.zeros(9, dtype=torch.float32))
+            self.select_sum_conv = nn.Conv2d(in_channels=channels, out_channels=channels, kernel_size=(1, 9), groups=channels)
+            self.select_sum_conv.weight = torch.nn.Parameter(torch.tensor([[[[1]*9]]]*channels, dtype=torch.float32))
+            self.select_sum_conv.bias = torch.nn.Parameter(torch.zeros(channels, dtype=torch.float32))
             self.upsample = nn.UpsamplingNearest2d(scale_factor=(1,9))
         elif type=='v':
             #vertical
-            self.select_sum_conv = nn.Conv2d(in_channels=9, out_channels=9, kernel_size=(9, 1), groups=9)
-            self.select_sum_conv.weight = torch.nn.Parameter(torch.tensor([[[[1]]*9]]*9, dtype=torch.float32))
-            self.select_sum_conv.bias = torch.nn.Parameter(torch.zeros(9, dtype=torch.float32))
+            self.select_sum_conv = nn.Conv2d(in_channels=channels, out_channels=channels, kernel_size=(9, 1), groups=channels)
+            #print(f"{self.select_sum_conv.weight.shape=}")
+            self.select_sum_conv.weight = torch.nn.Parameter(torch.tensor([[[[1]]*9]]*channels, dtype=torch.float32))
+            #print(f"{self.select_sum_conv.weight.shape=}")
+            self.select_sum_conv.bias = torch.nn.Parameter(torch.zeros(channels, dtype=torch.float32))
             self.upsample = nn.UpsamplingNearest2d(scale_factor=(9,1))
         elif type=='box':
             #box
             self.use_upsample3 = True
-            self.select_sum_conv = nn.Conv2d(in_channels=9, out_channels=9, kernel_size=3, groups=9, stride=3)
-            self.select_sum_conv.weight = torch.nn.Parameter(torch.tensor([[[[1]*3]*3]]*9, dtype=torch.float32))
-            self.select_sum_conv.bias = torch.nn.Parameter(torch.zeros(9, dtype=torch.float32))
+            self.select_sum_conv = nn.Conv2d(in_channels=channels, out_channels=channels, kernel_size=3, stride=3, groups=channels)
+            self.select_sum_conv.weight = torch.nn.Parameter(torch.tensor([[[[1]*3]*3]]*channels, dtype=torch.float32))
+            self.select_sum_conv.bias = torch.nn.Parameter(torch.zeros(channels, dtype=torch.float32))
             self.upsample = nn.UpsamplingNearest2d(scale_factor=3)
             pass
         else:
@@ -288,16 +291,69 @@ class SudokuDigitsDoubles(nn.Module):
     '''
     def __init__(self, type):
         super(SudokuDigitsDoubles,self).__init__()
-        self.sum_downsample = SudokuSumDownsample(type)
+        self.sum_downsample36 = SudokuSumDownsample(type, channels=36)
+        self.sum_downsample9 = SudokuSumDownsample(type, channels=9)
+        #print(f"{self.sum_permutations.weight.shape=}")
+        #print(f"{self.sum_permutations.bias.shape=}")
+        #self.sum_permutations.weight.shape=torch.Size([36, 9, 1, 1])
+
+        all_weights = []
+        count = 0
+        encode_permutations_np = np.zeros((36,9))
+        decode_permutations_np = np.zeros((9,36))
+        
+        for i in range(0,8):
+            for j in range(i+1, 9):
+                encode_permutations_np[count,i] = 1.
+                encode_permutations_np[count,j] = 1.
+                decode_permutations_np[i,count] = 1.
+                decode_permutations_np[j,count] = 1.
+                count += 1
+        assert count==36
+        encode_permutations = torch.tensor(encode_permutations_np, dtype=torch.float32).unsqueeze(2).unsqueeze(3)
+        print(f"{encode_permutations.shape=}")
+        decode_permutations = torch.tensor(decode_permutations_np, dtype=torch.float32).unsqueeze(2).unsqueeze(3)
+
         self.sum_permutations = nn.Conv2d(in_channels=9, out_channels=36, kernel_size=1)
+        self.sum_permutations.weight = torch.nn.Parameter(encode_permutations)
+        self.sum_permutations.bias = torch.nn.Parameter(torch.zeros(36, dtype=torch.float32))
+
+        self.decode_permutations = nn.Conv2d(in_channels=36, out_channels=9, kernel_size=1)
+        print(f"{self.decode_permutations.weight.shape=}")
+        print(f"{self.decode_permutations.bias.shape=}")
+        self.decode_permutations.weight = torch.nn.Parameter(decode_permutations)
+        self.decode_permutations.bias = torch.nn.Parameter(torch.zeros(9, dtype=torch.float32))
+
+        self.sum_all_permutations = nn.Conv2d(in_channels=36, out_channels=1, kernel_size=1)
+        #print(f"{self.sum_all_permutations.weight.shape=}")
+        self.sum_all_permutations.weight = torch.nn.Parameter(torch.ones((1,36,1,1), dtype=torch.float32))
+        #print(f"{self.sum_all_permutations.weight.shape=}")
+        self.sum_all_permutations.bias = torch.nn.Parameter(torch.zeros(1, dtype=torch.float32))
+        
 
     def forward(self, mask : torch.Tensor) -> torch.Tensor:
-        #сумма, сколько раз элементы встречаются на этой h/v/box
-        sum_mask_elem = self.sum_downsample.downsample(mask)
-        #маска элементов которые встречаются на этой h/v/box два раза
-        two_mask_elem = NNCompare(sum_mask_elem, 2)
-        two_mask_elem = self.sum_downsample.upsample(two_mask_elem)
-        return two_mask_elem
+        #сумма по 2 элемента в этой ячейке во всех комбинациях
+        permutations = self.sum_permutations(mask)
+        permutations = NNCompare(permutations, 2)
+
+        sum_permutations = self.sum_all_permutations(permutations)
+        sum_permutations = NNCompare(sum_permutations, 1)
+        permutations = NNAnd(permutations, sum_permutations.expand_as(permutations))
+        #тут в permutations только те ячейки, в которых только 2 элемента
+        #return self.decode_permutations(permutations)
+
+        #суммируем по h/v/box
+        down_permutations = self.sum_downsample36.downsample(permutations)
+        #у нас сумма по 2 элемента
+        down_permutations = NNCompare(down_permutations, 2)
+        up_permutations = self.sum_downsample36.upsample(down_permutations)
+
+        #тут в up_permutations уже выбранные по h/v/box наши двойки чисел
+        up_permutations = NNAnd(up_permutations, NNNot(permutations))
+        
+        erase_mask = self.decode_permutations(up_permutations)
+        #return erase_mask
+        return NNAnd(mask, NNNot(erase_mask))
 
 '''
 В отдельном тестовом проекте попробовать сделать упаковку массива с кучей нулевых элементов.
