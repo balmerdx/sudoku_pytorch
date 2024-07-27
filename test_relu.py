@@ -18,6 +18,7 @@ for x in range(6):
 
 '''
 
+'''
 import numpy as np
 import torch
 import torch.nn as nn
@@ -44,3 +45,11 @@ negate_mask_max = pool(line_mask).expand_as(line_mask)
 negate_mask = NNAnd(negate_mask_max, NNNot(line_mask))
 print(f"{line_mask.shape=} -> {negate_mask.shape=}")
 pass
+'''
+
+count = 0
+for i in range(0,8):
+    for j in range(i+1, 9):
+        print(i,j)
+        count += 1
+print(count)

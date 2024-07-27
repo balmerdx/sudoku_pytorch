@@ -84,6 +84,46 @@ class SudokuNumbersInCell(nn.Module):
         select_number1 = self.select_number1_relu(self.select_number1_conv(x))
         select_number2 = self.select_number2_relu(self.select_number2_conv(x))
         return torch.mul(select_number1, select_number2)
+    
+class SudokuSumDownsample:
+    '''
+    Вспомогательный класс.
+    type = "h" | "v" | "box"
+    Уменьшает элементы но горизонтали/вертикали/box3x3 и суммирует.
+    Потом можно обратно увеличить.
+    '''
+    def __init__(self, type : str):
+        if type=='h':
+            #horizontal
+            self.select_sum_conv = nn.Conv2d(in_channels=9, out_channels=9, kernel_size=(1, 9), groups=9)
+            self.select_sum_conv.weight = torch.nn.Parameter(torch.tensor([[[[1]*9]]]*9, dtype=torch.float32))
+            self.select_sum_conv.bias = torch.nn.Parameter(torch.zeros(9, dtype=torch.float32))
+            self.upsample = nn.UpsamplingNearest2d(scale_factor=(1,9))
+        elif type=='v':
+            #vertical
+            self.select_sum_conv = nn.Conv2d(in_channels=9, out_channels=9, kernel_size=(9, 1), groups=9)
+            self.select_sum_conv.weight = torch.nn.Parameter(torch.tensor([[[[1]]*9]]*9, dtype=torch.float32))
+            self.select_sum_conv.bias = torch.nn.Parameter(torch.zeros(9, dtype=torch.float32))
+            self.upsample = nn.UpsamplingNearest2d(scale_factor=(9,1))
+        elif type=='box':
+            #box
+            self.use_upsample3 = True
+            self.select_sum_conv = nn.Conv2d(in_channels=9, out_channels=9, kernel_size=3, groups=9, stride=3)
+            self.select_sum_conv.weight = torch.nn.Parameter(torch.tensor([[[[1]*3]*3]]*9, dtype=torch.float32))
+            self.select_sum_conv.bias = torch.nn.Parameter(torch.zeros(9, dtype=torch.float32))
+            self.upsample = nn.UpsamplingNearest2d(scale_factor=3)
+            pass
+        else:
+            #unknown type
+            assert 0
+
+    def downsample(self, mask):
+        #уменьшает и суммирует
+        return self.select_sum_conv(mask)
+    
+    def upsample(self, mask_down):
+        return self.upsample(mask_down)
+
 
 class SudokuFilterHVBox(nn.Module):
     '''
@@ -103,41 +143,16 @@ type = "h" | "v" | "box"
     '''
     def __init__(self, type : str):
         super(SudokuFilterHVBox,self).__init__()
-        
-        self.use_upsample3 = False
-        if type=='h':
-            #horizontal
-            self.select_sum_conv = nn.Conv2d(in_channels=9, out_channels=9, kernel_size=(1, 9), groups=9)
-            self.select_sum_conv.weight = torch.nn.Parameter(torch.tensor([[[[1]*9]]]*9, dtype=torch.float32))
-            self.select_sum_conv.bias = torch.nn.Parameter(torch.zeros(9, dtype=torch.float32))
-        elif type=='v':
-            #vertical
-            self.select_sum_conv = nn.Conv2d(in_channels=9, out_channels=9, kernel_size=(9, 1), groups=9)
-            self.select_sum_conv.weight = torch.nn.Parameter(torch.tensor([[[[1]]*9]]*9, dtype=torch.float32))
-            self.select_sum_conv.bias = torch.nn.Parameter(torch.zeros(9, dtype=torch.float32))
-        elif type=='box':
-            #box
-            self.use_upsample3 = True
-            self.select_sum_conv = nn.Conv2d(in_channels=9, out_channels=9, kernel_size=3, groups=9, stride=3)
-            self.select_sum_conv.weight = torch.nn.Parameter(torch.tensor([[[[1]*3]*3]]*9, dtype=torch.float32))
-            self.select_sum_conv.bias = torch.nn.Parameter(torch.zeros(9, dtype=torch.float32))
-            self.upsample3 = nn.UpsamplingNearest2d(scale_factor=3)
-            pass
-        else:
-            #unknown type
-            assert 0
+
+        self.sum_downsample = SudokuSumDownsample(type)
 
     def forward(self, mask : torch.Tensor, exact_cells : torch.Tensor) -> torch.Tensor:
         exact_cell_expanded = exact_cells.expand_as(mask)
         exact_mask = torch.mul(mask, exact_cell_expanded)
 
         #маска элементов которые точно встречаются на этой строке
-        sum_mask_elem = self.select_sum_conv(exact_mask)
-
-        if self.use_upsample3:
-            sum_mask_elem = self.upsample3(sum_mask_elem)
-        else:
-            sum_mask_elem = sum_mask_elem.expand_as(mask)
+        sum_mask_elem = self.sum_downsample.downsample(exact_mask)
+        sum_mask_elem = self.sum_downsample.upsample(sum_mask_elem)
 
         #маска элементов которые надо оставить
         sum_mask_pos = torch.mul(NNNot(sum_mask_elem), NNNot(exact_cell_expanded))
@@ -153,34 +168,7 @@ class  SudokuUniqueHVBox(nn.Module):
     '''
     def __init__(self, type : str):
         super(SudokuUniqueHVBox,self).__init__()
-        self.use_upsample3 = False
-        if type=='h':
-            #horizontal
-            self.select_sum_conv = nn.Conv2d(in_channels=9, out_channels=9, kernel_size=(1, 9), groups=9)
-            self.select_sum_conv.weight = torch.nn.Parameter(torch.tensor([[[[1]*9]]]*9, dtype=torch.float32))
-            self.select_sum_conv.bias = torch.nn.Parameter(torch.zeros(9, dtype=torch.float32))
-            #print(f"{self.select_sum_conv.weight.shape=}")
-            #print(f"{self.select_sum_conv.bias.shape=}")
-        elif type=='v':
-            #vertical
-            self.select_sum_conv = nn.Conv2d(in_channels=9, out_channels=9, kernel_size=(9, 1), groups=9)
-            self.select_sum_conv.weight = torch.nn.Parameter(torch.tensor([[[[1]]*9]]*9, dtype=torch.float32))
-            self.select_sum_conv.bias = torch.nn.Parameter(torch.zeros(9, dtype=torch.float32))
-            #print(f"{self.select_sum_conv.weight.shape=}")
-            #print(f"{self.select_sum_conv.bias.shape=}")
-        elif type=='box':
-            #box
-            self.use_upsample3 = True
-            self.select_sum_conv = nn.Conv2d(in_channels=9, out_channels=9, kernel_size=3, groups=9, stride=3)
-            self.select_sum_conv.weight = torch.nn.Parameter(torch.tensor([[[[1]*3]*3]]*9, dtype=torch.float32))
-            self.select_sum_conv.bias = torch.nn.Parameter(torch.zeros(9, dtype=torch.float32))
-            self.upsample3 = nn.UpsamplingNearest2d(scale_factor=3)
-            #print(f"{self.select_sum_conv.weight.shape=}")
-            #print(f"{self.select_sum_conv.bias.shape=}")
-            pass
-        else:
-            #unknown type
-            assert 0
+        self.sum_downsample = SudokuSumDownsample(type)
 
         self.uniq_cell_conv = nn.Conv2d(in_channels=9, out_channels=1, kernel_size=1)
         self.uniq_cell_conv.weight = torch.nn.Parameter(torch.tensor([[[[-1]]]*9], dtype=torch.float32))
@@ -189,14 +177,11 @@ class  SudokuUniqueHVBox(nn.Module):
 
     def forward(self, mask : torch.Tensor) -> torch.Tensor:
         #сумма, сколько раз элементы встречаются на этой строке
-        sum_mask_elem = self.select_sum_conv(mask)
+        sum_mask_elem = self.sum_downsample.downsample(mask)
         #маска элементов которые встречаются на этой строке только один раз
         uniq_mask_elem = NNCompare(sum_mask_elem, 1)
-
-        if self.use_upsample3:
-            uniq_mask_elem = self.upsample3(uniq_mask_elem)
-        else:
-            uniq_mask_elem = uniq_mask_elem.expand_as(mask)
+        
+        uniq_mask_elem = self.sum_downsample.upsample(uniq_mask_elem)
 
         #выделяем ячейки в которых нет таких чисел
         not_uniq_cell_mask = torch.fmin(uniq_mask_elem, mask)
@@ -277,23 +262,27 @@ class SudokuDigitsInOneLineAtBox(nn.Module):
         return NNAnd(mask, NNNot(negate_mask_upsampled))
 
 '''
-Тестовая фича. Если шаг фильтрации ничего не дал, то пропускать его. --ok
-Тестовая фича. Рисовать отфильтрованные на этом шаге элементы светло-серым цветом.
-'''
-
-'''
 Класс, который проверяет в horizontal, vertical, box. Если есть две ячейки в которых 2 одинаковых числа,
 то в этом случае значит в других ячейках этих чисел нет.
 
 - считаем количество повторений в horizontal, vertical, box. Нам нужны числа, у которых 2 повторения.
   и вот тут возникает сложность, что делать дальше?
-  Перебирать все комбинации слишком долго. Хотя может и не долго 8*7/2 = 28 комбинаций.
+  Перебирать все комбинации слишком долго. Хотя может и не долго 9*8/2 = 36 комбинаций.
   Это можно себе позволить пока у нас всего 9 чисел.
   Для каждой из комбинаций 1+2, 1+3 .. 8+9 смотрим, что:
    - соответствующих чисел только 2
    - что они находятся в одной и той-же ячейке
   Используя эту маску очищаем все остальные цифры в этой ячейке.
   Далее используя эту маску можно очищать цифры вне этой ячейки.
+
+  - маска, что есть только 2 числа в h/v/box
+  - ячейки где есть только 2 числа которых 2 в h/v/box
+  - for i in range(0,8): for j in range(i+1, 9): i,j = 36 штук
+    Сделаем nn.Conv2d(in_channels=1, out_channels=36, kernel_size=1)
+    в котором получаются суммы соответсвующих каналов и сравниваем их с 2.
+  - Суммируя всё по h/v/box мы можем узнать, что таких элементов ровно 2.
+    делаем UpsamplingNearest2d и фильтруем получившиеся 36 каналов для каждой ячейки
+  - потом эти значения можно отфильтровать из всех оставшися в h/v/box элементов
 '''
 
 '''

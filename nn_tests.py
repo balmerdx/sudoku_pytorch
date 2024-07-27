@@ -48,7 +48,7 @@ def get_puzzle(filename="data/puzzles0_kaggle", idx=None):
     with open(filename, "rb") as f:
         while True:
             line = f.readline()
-            if line[0]!='#':
+            if line[0]!=b'#'[0]:
                 break
         if idx is None:
             import random
@@ -71,8 +71,8 @@ def get_puzzle(filename="data/puzzles0_kaggle", idx=None):
 #sudoku = b".....8.568...92...1.....28.7.6....1..8.9.6.4..1....9.2.48.....7...24...595.6....." #hard
 #sudoku = b"5..6....3.....3.2.9..2.7.8...8....32..43..9.5..9....688..7.2.5......4.7.7..9....6" #veryhard
 #sudoku = b"8.........95.......76.........426798...571243...893165......916....3.487....1.532" #puzzles7_serg_benchmark extra hard
-sudoku = b'.................1.....2.34.....4.....5...6....6.3.....3..6.....7..5.8..24......7' #data/puzzles2_17_clue 19 требуется двойка одинаковых чисел
-#sudoku = get_puzzle("data/puzzles2_17_clue") #get_puzzle data/puzzles2_17_clue 19 требуется двойка одинаковых чисел
+#sudoku = b'.................1.....2.34.....4.....5...6....6.3.....3..6.....7..5.8..24......7' #data/puzzles2_17_clue 19 требуется двойка одинаковых чисел
+sudoku = get_puzzle("data/puzzles2_17_clue")
 
 ds = DrawSudoku(enable_store_images=True)
 input = np.frombuffer(sudoku, dtype=np.int8)
@@ -138,6 +138,7 @@ for idx in range(10):
     mask = new_mask
     if is_equal.item() > 0:
         draw(f"digits_in_one_line_at_box_v  {idx}")
+    
  
 pass
 
