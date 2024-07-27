@@ -43,19 +43,24 @@ def draw(name="Initial"):
     ds.draw_sudoku(sudoku=sudoku.decode(), hints=mask_to_np(mask), store_prev_hints=True, use_prev_hints=False)
     ds.show()
 
-def get_random_puzzle(filename="data/puzzles0_kaggle"):
+def get_puzzle(filename="data/puzzles0_kaggle", idx=None):
     #берём из первой сотни
     with open(filename, "rb") as f:
         while True:
             line = f.readline()
             if line[0]!='#':
                 break
-        import random
-        ri = random.randint(0, 100)
-        print("get_random_puzzle", filename, ri)
+        if idx is None:
+            import random
+            ri = random.randint(0, 100)
+        else:
+            ri = idx
+        print("get_puzzle", filename, ri)
         for i in range(ri):
             line = f.readline()
-        return line.strip()
+        line = line.strip()
+        print(line)
+        return line
 
 
 
@@ -66,7 +71,8 @@ def get_random_puzzle(filename="data/puzzles0_kaggle"):
 #sudoku = b".....8.568...92...1.....28.7.6....1..8.9.6.4..1....9.2.48.....7...24...595.6....." #hard
 #sudoku = b"5..6....3.....3.2.9..2.7.8...8....32..43..9.5..9....688..7.2.5......4.7.7..9....6" #veryhard
 #sudoku = b"8.........95.......76.........426798...571243...893165......916....3.487....1.532" #puzzles7_serg_benchmark extra hard
-sudoku = get_random_puzzle("data/puzzles2_17_clue") #get_random_puzzle data/puzzles2_17_clue 19 где требуется двойка одинаковых чисел
+sudoku = b'.................1.....2.34.....4.....5...6....6.3.....3..6.....7..5.8..24......7' #data/puzzles2_17_clue 19 требуется двойка одинаковых чисел
+#sudoku = get_puzzle("data/puzzles2_17_clue") #get_puzzle data/puzzles2_17_clue 19 требуется двойка одинаковых чисел
 
 ds = DrawSudoku(enable_store_images=True)
 input = np.frombuffer(sudoku, dtype=np.int8)
@@ -90,6 +96,9 @@ digits_in_one_line_at_box_v = SudokuDigitsInOneLineAtBox("v")
 draw() 
 
 for idx in range(10):
+    '''
+    #remove_h, remove_v видимо не нужны, они в более общем виде
+    #в digits_in_one_line_at_box_h,digits_in_one_line_at_box_h обрабатываются
     mask_exact = conv_exact(mask)
     new_mask = remove_h(mask, mask_exact)
     is_equal = sudoku_equal(new_mask, mask)
@@ -103,6 +112,7 @@ for idx in range(10):
     mask = new_mask
     if is_equal.item() > 0:
         draw(f"remove_v {idx}")
+    '''
 
     mask_exact = conv_exact(mask)
     new_mask = remove_box(mask, mask_exact)
