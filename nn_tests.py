@@ -6,7 +6,7 @@ from sudoku_nn import *
 
 def draw(name="Initial", back_mask=None):
     print(name)
-    if not(ds.prev_hints is None):
+    if mask.shape[0]==1 and not(ds.prev_hints is None):
         ds.draw_sudoku(sudoku=sudoku.decode(), hints=mask_to_np(mask), store_prev_hints=False, prev_intensity=128, back_mask=back_mask)
         ds.show(time_msec=300)
         ds.draw_sudoku(sudoku=sudoku.decode(), hints=mask_to_np(mask), store_prev_hints=False, prev_intensity=192, back_mask=back_mask)
@@ -33,7 +33,12 @@ def get_puzzle(filename="data/puzzles0_kaggle", idx=None):
         print(line)
         return line
 
-
+def sudoku_to_mask(sudoku):
+    conv_sudoku = ConvSudokuTextToBits()
+    input = np.frombuffer(sudoku, dtype=np.int8)
+    input = np.reshape(input, newshape=(1,1,9,9))
+    input = torch.tensor(input, dtype=torch.float32)
+    return conv_sudoku(input)
 
 #sudoku = b'9...84.6.6.4..52.7.3..7..8.76...15...53.....1...4.96.31.5.26.9...2.4....8....371.' #easy
 #sudoku = b".68..5.9.7...12..6...86...287....3...92...51...3....671...83...6..59...3.5.7..18." #medium
@@ -47,15 +52,21 @@ def get_puzzle(filename="data/puzzles0_kaggle", idx=None):
 #sudoku = b'.................1.....2.34.....4.....5...6....6.3.....3..6.....7..5.8..24......7' #data/puzzles2_17_clue 19 требуется двойка одинаковых чисел
 #sudoku = b'........6.....6..1.675.29347.26.43953.572.6484.6.3517253826741967.45.82324....567' #data/puzzles2_17_clue 19 до состояния кода требуется двойка
 #sudoku = get_puzzle("data/puzzles2_17_clue")
-sudoku = get_puzzle("data/puzzles1_unbiased") #можно как hardest использовать не особо сложные
+#sudoku = get_puzzle("data/puzzles1_unbiased") #можно как hardest использовать не особо сложные
+
+sudoku  = b'9...84.6.6.4..52.7.3..7..8.76...15...53.....1...4.96.31.5.26.9...2.4....8....371.'
+sudoku2 = b".68..5.9.7...12..6...86...287....3...92...51...3....671...83...6..59...3.5.7..18."
 
 ds = DrawSudoku(enable_store_images=True)
 input = np.frombuffer(sudoku, dtype=np.int8)
 input = np.reshape(input, newshape=(1,1,9,9))
 input = torch.tensor(input, dtype=torch.float32)
 
-conv_sudoku = ConvSudokuTextToBits()
-mask = conv_sudoku(input)
+
+mask = sudoku_to_mask(sudoku)
+#mask2 = sudoku_to_mask(sudoku2)
+#mask = torch.cat([mask, mask2], dim=0)
+
 
 remove_h = SudokuFilterHVBox("h")
 remove_v = SudokuFilterHVBox("v")
@@ -79,7 +90,8 @@ for idx in range(15):
         new_mask = function(mask)
         is_equal = sudoku_equal(new_mask, mask)
         mask = new_mask
-        if is_equal.item() > 0:
+        #всегда рисуем, если у нас параллельно два судоку решается
+        if is_equal.shape[0]>1 or is_equal.item() > 0:
             draw(f"{idx} {name}")
 
     '''
@@ -102,7 +114,9 @@ for idx in range(15):
     test_hints = NNOr(test_hints, doubles_h(mask, True))
 
     draw(f"{idx} uniq_h uniq_v uniq_box", test_hints)
-    print(hints_to_str(mask))
+
+    if mask.shape[0]==1:
+        print(hints_to_str(mask))
    
     one_pass(doubles_h, 'doubles_h')
     one_pass(doubles_v, 'doubles_v')

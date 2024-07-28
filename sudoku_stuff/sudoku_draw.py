@@ -4,30 +4,38 @@ import numpy as np
 import torch
 def mask_to_np(mask):
     if isinstance(mask, torch.Tensor):
-        assert mask.shape[0]==1
+        assert mask.shape[0]==1 or mask.shape[0]==2
         assert mask.shape[1]==1 or mask.shape[1]==9
         assert mask.shape[2]==9
         assert mask.shape[3]==9
         if mask.shape[1]==1:
-            mask = mask.expand((1,9,9,9))
+            mask = mask.expand((mask.shape[0],9,9,9))
+        if mask.shape[0]==2:
+            #dim 0 - количество sudoku, 1-y, 2-x, 3-биты наличия 1..9
+            return mask.permute(0,2,3,1).detach().numpy()
         return torch.squeeze(mask, 0).permute(1,2,0).detach().numpy()
     return mask
 
 class DrawSudoku:
-    def __init__(self, enable_store_images=False):
+    def __init__(self, enable_store_images=False, fontname="/usr/share/fonts/truetype/ubuntu/UbuntuMono-R.ttf"):
         self.cell_size = 3*24
         self.line_width = 1
         self.line_width2 = 2
         self.image_size = 9*self.cell_size + 6*self.line_width + 4*self.line_width2
-        self.big_font = ImageFont.truetype("/usr/share/fonts/truetype/ubuntu/UbuntuMono-R.ttf", size=self.cell_size)
-        self.small_font = ImageFont.truetype("/usr/share/fonts/truetype/ubuntu/UbuntuMono-R.ttf", size=self.cell_size//3)
+        self.big_font = ImageFont.truetype(fontname, size=self.cell_size)
+        self.small_font = ImageFont.truetype(fontname, size=self.cell_size//3)
         self.img = Image.new("RGB", (self.image_size, self.image_size))
+        self.img_planes = []
+        self.img_planes.append(self.img.copy())
+        self.img_planes.append(self.img.copy())
         #список в которых сохраняем все изображения.
         self.store_all_images=[] if enable_store_images else None
         self.prev_hints = None
 
-    def make_grid(self):
-        d = ImageDraw.Draw(self.img)
+    def make_grid(self, img=None):
+        if img is None:
+            img = self.img
+        d = ImageDraw.Draw(img)
         d.rectangle((0,0,self.img.width, self.img.height), fill=(255,255,255))
         dxy = (self.image_size-self.line_width2)//3
         cell1 = self.cell_size + self.line_width
@@ -88,9 +96,12 @@ class DrawSudoku:
                 continue
             break
 
-    def _draw_back_mask(self, draw : ImageDraw.ImageDraw, back_mask, color):
+    def _draw_back_mask(self, back_mask, color):
         if back_mask is None:
             return
+        if len(back_mask.shape)!=3:
+            return
+        draw = ImageDraw.Draw(self.img, "RGBA")
         back_mask = mask_to_np(back_mask)
         sc = self.cell_size//3
         for y in range(9):
@@ -106,33 +117,7 @@ class DrawSudoku:
                     pass
         pass
 
-    def draw_sudoku(self,
-                    sudoku="8.........95.......76.........426798...571243...893165......916....3.487....1.532",
-                    hints=None,
-                    use_prev_hints=True,
-                    store_prev_hints=True,
-                    prev_intensity=192,
-                    back_mask = None,
-                    back_mask_color = (100,255,100,128)
-                    ):
-        '''
-        hints = это массив из 0 и 1. Всё что не ноль считаем единицей.
-        там 3 индекса. Нулевой - y, первый - x, второй - 9 значений 0 или 1 в пределах ячейки.
-        Если все нули - то на этой ячейке ничего невозможно поставить.
-        Если все единицы - то поставить можно что угодно.
-        Если только одна единица, то значит тут одно известное число.
-        '''
-        assert((sudoku is None) or len(sudoku)==81)
-        if not(hints is None):
-            assert(len(hints.shape)==3)
-            assert(hints.shape[0]==9) #y
-            assert(hints.shape[1]==9) #x
-            assert(hints.shape[2]==9)
-
-        if use_prev_hints and (self.prev_hints is None):
-            use_prev_hints = False
-        prev_color = (0,prev_intensity,0)
-
+    def _draw_sudoku(self, sudoku, hints, use_prev_hints, prev_hints, prev_color, img=None):
         def is_hints(cell_hints):
             is_resolved_ = False
             is_partial_ = False
@@ -149,14 +134,14 @@ class DrawSudoku:
                 is_invalid_ = hint_sum==0
                 is_partial_ = not is_invalid_ and not (hint_sum==9)
             return is_resolved_, is_partial_, is_invalid_
-
-
-        self.make_grid()
-
+        
+        if img is None:
+            img = self.img
+        self.make_grid(img)
 
         offsety_big = -8
         offsety_sm = -2
-        d = ImageDraw.Draw(self.img, "RGBA")
+        d = ImageDraw.Draw(img, "RGB")
         for i in range(81):
             if sudoku is None:
                 s = "."
@@ -176,7 +161,7 @@ class DrawSudoku:
                 cell_hints = hints[y,x,:]
                 is_resolved, is_partial, is_invalid = is_hints(cell_hints)
                 if use_prev_hints:
-                    prev_cell_hints = self.prev_hints[y,x,:]
+                    prev_cell_hints = prev_hints[y,x,:]
                     is_resolved_p, is_partial_p, is_invalid_p = is_hints(prev_cell_hints)
                     if is_resolved and is_resolved_p:
                         s = is_resolved
@@ -212,7 +197,65 @@ class DrawSudoku:
                     s = str(j+1)
                     _,_, tw, th = d.textbbox((0,0), s, font=self.small_font)
                     d.text((sm_cx+(sc-tw)//2, sm_cy+(sc-th)//2+offsety_sm), s, fill=color, font=self.small_font)
-        self._draw_back_mask(d, back_mask, back_mask_color)
+        pass
+
+    def draw_sudoku(self,
+                    sudoku="8.........95.......76.........426798...571243...893165......916....3.487....1.532",
+                    hints=None,
+                    use_prev_hints=True,
+                    store_prev_hints=True,
+                    prev_intensity=192,
+                    back_mask = None,
+                    back_mask_color = (100,255,100,128)
+                    ):
+        '''
+        hints = это массив из 0 и 1. Всё что не ноль считаем единицей.
+        там 3 индекса. Нулевой - y, первый - x, второй - 9 значений 0 или 1 в пределах ячейки.
+        Если все нули - то на этой ячейке ничего невозможно поставить.
+        Если все единицы - то поставить можно что угодно.
+        Если только одна единица, то значит тут одно известное число.
+        '''
+        assert((sudoku is None) or len(sudoku)==81)
+        two_hints = False
+        if not(hints is None):
+            assert(len(hints.shape)==3 or len(hints.shape)==4)
+            if len(hints.shape)==3:
+                assert(hints.shape[0]==9) #y
+                assert(hints.shape[1]==9) #x
+                assert(hints.shape[2]==9)
+            else:
+                two_hints = True
+                assert(hints.shape[0]==2)
+                assert(hints.shape[1]==9) #y
+                assert(hints.shape[2]==9) #x
+                assert(hints.shape[3]==9)
+
+
+        if use_prev_hints and (self.prev_hints is None):
+            use_prev_hints = False
+        prev_color = (0,prev_intensity,0)
+
+        def get_prev_hints(idx):
+            if self.prev_hints is None:
+                return None
+            if len(self.prev_hints.shape)==3:
+                return self.prev_hints
+            return self.prev_hints[idx,:,:,:]
+
+        if two_hints:
+            img0 = self.img_planes[0]
+            img1 = self.img_planes[1]
+            self._draw_sudoku(sudoku, hints[0,:,:,:], use_prev_hints, prev_hints=get_prev_hints(0), prev_color=prev_color, img=img0)
+            self._draw_sudoku(sudoku, hints[1,:,:,:], use_prev_hints, prev_hints=get_prev_hints(0), prev_color=prev_color, img=img1)
+
+            chR = img0.getchannel('G')
+            chG = img1.getchannel('G')
+            chB = Image.blend(img0.getchannel('B'), img1.getchannel('B'), 0.5)
+            self.img = Image.merge("RGB", (chR, chG, chB))
+        else:
+            self._draw_sudoku(sudoku, hints, use_prev_hints, prev_hints=get_prev_hints(0), prev_color=prev_color)
+
+        self._draw_back_mask(back_mask, back_mask_color)
         if not (self.store_all_images is None):
             self.store_all_images.append(self.img.copy())
 
