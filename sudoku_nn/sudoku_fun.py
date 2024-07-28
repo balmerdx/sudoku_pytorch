@@ -63,13 +63,13 @@ class ConvSudokuTextToBits(nn.Module):
         select_number = torch.mul(select_number1, select_number2)
         return NNOr(select_number, input_zeros)
 
-class SudokuNumbersInCell(nn.Module):
+class SudokuNumbersInCellOld(nn.Module):
     '''
 для каждого из прямоугольников смотрим на числа от 0..9 и если у нас есть одно и только одно число (или точнее number_to_compare),
 то выставляем 1. Впринципе всё элементарно - надо просуммировать и сравнить с number_to_compare.
     '''
     def __init__(self, number_to_compare=1.):
-        super(SudokuNumbersInCell,self).__init__()
+        super(SudokuNumbersInCellOld,self).__init__()
 
         self.select_number1_conv = nn.Conv2d(in_channels=9, out_channels=1, kernel_size=1)
         self.select_number1_conv.weight = torch.nn.Parameter(torch.tensor([[[[1]]]*9], dtype=torch.float32))
@@ -86,7 +86,25 @@ class SudokuNumbersInCell(nn.Module):
         select_number1 = self.select_number1_relu(self.select_number1_conv(x))
         select_number2 = self.select_number2_relu(self.select_number2_conv(x))
         return torch.mul(select_number1, select_number2)
-    
+
+class SudokuNumbersInCell(nn.Module):
+    '''
+для каждого из прямоугольников смотрим на числа от 0..9 и если у нас есть одно и только одно число (или точнее number_to_compare),
+то выставляем 1. Впринципе всё элементарно - надо просуммировать и сравнить с number_to_compare.
+    '''
+    def __init__(self, number_to_compare=1.):
+        super(SudokuNumbersInCell,self).__init__()
+        self.number_to_compare = number_to_compare
+
+        self.select_number_conv = nn.Conv2d(in_channels=9, out_channels=1, kernel_size=1)
+        self.select_number_conv.weight = torch.nn.Parameter(torch.ones((1,9,1,1), dtype=torch.float32))
+        self.select_number_conv.bias = torch.nn.Parameter(torch.zeros(1, dtype=torch.float32))
+        pass
+
+    def forward(self, x : torch.Tensor) -> torch.Tensor:
+        select_number = self.select_number_conv(x)
+        return NNCompare(select_number, self.number_to_compare)
+
 class SudokuSumDownsample:
     '''
     Вспомогательный класс.
@@ -148,9 +166,11 @@ type = "h" | "v" | "box"
     def __init__(self, type : str):
         super(SudokuFilterHVBox,self).__init__()
 
+        self.numbers_in_cell = SudokuNumbersInCell()
         self.sum_downsample = SudokuSumDownsample(type)
 
-    def forward(self, mask : torch.Tensor, exact_cells : torch.Tensor) -> torch.Tensor:
+    def forward(self, mask : torch.Tensor) -> torch.Tensor:
+        exact_cells = self.numbers_in_cell(mask)
         exact_cell_expanded = exact_cells.expand_as(mask)
         exact_mask = torch.mul(mask, exact_cell_expanded)
 
@@ -204,11 +224,12 @@ class  SudokuUniqueHVBox(nn.Module):
         #return NNAnd(sum_mask_pos, mask)
 
 class  SudokuIsEqual(nn.Module):
+    ''' Сравнивает, что две маски одинаковые. Т.е. решение не продвинулось дальше'''
     def __init__(self):
         super(SudokuIsEqual,self).__init__()
         self.sum_all = nn.Conv2d(in_channels=9, out_channels=1, kernel_size=9)
-        print(f"{self.sum_all.weight.shape=}")
-        print(f"{self.sum_all.bias.shape=}")
+        #print(f"{self.sum_all.weight.shape=}")
+        #print(f"{self.sum_all.bias.shape=}")
         self.sum_all.weight = torch.nn.Parameter(torch.tensor([[[[1]*9]*9]*9], dtype=torch.float32))
         self.sum_all.bias = torch.nn.Parameter(torch.zeros(1, dtype=torch.float32))
 
@@ -269,35 +290,11 @@ class SudokuDigitsDoubles(nn.Module):
     '''
 Класс, который проверяет в horizontal, vertical, box. Если есть две ячейки в которых 2 одинаковых числа,
 то в этом случае значит в других ячейках этих чисел нет.
-
-- считаем количество повторений в horizontal, vertical, box. Нам нужны числа, у которых 2 повторения.
-  и вот тут возникает сложность, что делать дальше?
-  Перебирать все комбинации слишком долго. Хотя может и не долго 9*8/2 = 36 комбинаций.
-  Это можно себе позволить пока у нас всего 9 чисел.
-  Для каждой из комбинаций 1+2, 1+3 .. 8+9 смотрим, что:
-   - соответствующих чисел только 2
-   - что они находятся в одной и той-же ячейке
-  Используя эту маску очищаем все остальные цифры в этой ячейке.
-  Далее используя эту маску можно очищать цифры вне этой ячейки.
-
-  - маска, что есть только 2 числа в h/v/box
-  - ячейки где есть только 2 числа которых 2 в h/v/box
-  - for i in range(0,8): for j in range(i+1, 9): i,j = 36 штук
-    Сделаем nn.Conv2d(in_channels=1, out_channels=36, kernel_size=1)
-    в котором получаются суммы соответсвующих каналов и сравниваем их с 2.
-  - Суммируя всё по h/v/box мы можем узнать, что таких элементов ровно 2.
-    делаем UpsamplingNearest2d и фильтруем получившиеся 36 каналов для каждой ячейки
-  - потом эти значения можно отфильтровать из всех оставшися в h/v/box элементов
     '''
     def __init__(self, type):
         super(SudokuDigitsDoubles,self).__init__()
         self.sum_downsample36 = SudokuSumDownsample(type, channels=36)
-        self.sum_downsample9 = SudokuSumDownsample(type, channels=9)
-        #print(f"{self.sum_permutations.weight.shape=}")
-        #print(f"{self.sum_permutations.bias.shape=}")
-        #self.sum_permutations.weight.shape=torch.Size([36, 9, 1, 1])
 
-        all_weights = []
         count = 0
         encode_permutations_np = np.zeros((36,9))
         decode_permutations_np = np.zeros((9,36))
@@ -311,7 +308,6 @@ class SudokuDigitsDoubles(nn.Module):
                 count += 1
         assert count==36
         encode_permutations = torch.tensor(encode_permutations_np, dtype=torch.float32).unsqueeze(2).unsqueeze(3)
-        print(f"{encode_permutations.shape=}")
         decode_permutations = torch.tensor(decode_permutations_np, dtype=torch.float32).unsqueeze(2).unsqueeze(3)
 
         self.sum_permutations = nn.Conv2d(in_channels=9, out_channels=36, kernel_size=1)
@@ -319,19 +315,15 @@ class SudokuDigitsDoubles(nn.Module):
         self.sum_permutations.bias = torch.nn.Parameter(torch.zeros(36, dtype=torch.float32))
 
         self.decode_permutations = nn.Conv2d(in_channels=36, out_channels=9, kernel_size=1)
-        print(f"{self.decode_permutations.weight.shape=}")
-        print(f"{self.decode_permutations.bias.shape=}")
         self.decode_permutations.weight = torch.nn.Parameter(decode_permutations)
         self.decode_permutations.bias = torch.nn.Parameter(torch.zeros(9, dtype=torch.float32))
 
         self.sum_all_permutations = nn.Conv2d(in_channels=36, out_channels=1, kernel_size=1)
-        #print(f"{self.sum_all_permutations.weight.shape=}")
         self.sum_all_permutations.weight = torch.nn.Parameter(torch.ones((1,36,1,1), dtype=torch.float32))
-        #print(f"{self.sum_all_permutations.weight.shape=}")
         self.sum_all_permutations.bias = torch.nn.Parameter(torch.zeros(1, dtype=torch.float32))
         
 
-    def forward(self, mask : torch.Tensor) -> torch.Tensor:
+    def forward(self, mask : torch.Tensor, return_erase=False) -> torch.Tensor:
         #сумма по 2 элемента в этой ячейке во всех комбинациях
         permutations = self.sum_permutations(mask)
         permutations = NNCompare(permutations, 2)
@@ -352,7 +344,8 @@ class SudokuDigitsDoubles(nn.Module):
         up_permutations = NNAnd(up_permutations, NNNot(permutations))
         
         erase_mask = self.decode_permutations(up_permutations)
-        #return erase_mask
+        if return_erase:
+            return erase_mask
         return NNAnd(mask, NNNot(erase_mask))
 
 '''
