@@ -13,7 +13,7 @@ def mask_to_np(mask):
         if mask.shape[0]==2:
             #dim 0 - количество sudoku, 1-y, 2-x, 3-биты наличия 1..9
             return mask.permute(0,2,3,1).detach().numpy()
-        return torch.squeeze(mask, 0).permute(1,2,0).detach().numpy()
+        return torch.squeeze(mask, 0).permute(1,2,0).detach().cpu().numpy()
     return mask
 
 class DrawSudoku:

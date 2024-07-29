@@ -2,22 +2,25 @@ import torch
 import torch.nn as nn
 import numpy as np
 
+@torch.no_grad()
 def NNOr(x,y):
     return torch.clamp(torch.fmax(x,y), 0, 1)
 
+@torch.no_grad()
 def NNAnd(x,y):
     return torch.clamp(torch.fmin(x,y), 0, 1)
 
+@torch.no_grad()
 def NNNot(x):
     return torch.sub(1, x)
 
+@torch.no_grad()
 def NNCompare(x, value):
     #зануляем числа меньше x
     a = nn.functional.relu(torch.add(x, -value+1))
     b = nn.functional.relu(torch.sub(value+1, x))
     #зануляем числа больше x
     return torch.fmin(a,b)
-
 
 class ConvSudokuTextToBits(nn.Module):
     '''
@@ -27,28 +30,28 @@ class ConvSudokuTextToBits(nn.Module):
 для примера [1,2,3] - в ячейке с y=1,x=2 возможно существование числа 4 (т.к. у нас индекс 0 это число 1)
     '''
 
-    def __init__(self):
+    def __init__(self, dtype):
         super(ConvSudokuTextToBits,self).__init__()
         self.sudoku_relu = nn.ReLU()
-        self.sub_zero_char = torch.tensor([ord(b"0")], dtype=torch.float32)
+        self.sub_zero_char = torch.tensor([ord(b"0")], dtype=dtype)
 
         self.select_zero_conv = nn.Conv2d(in_channels=1, out_channels=1, kernel_size=1)
-        self.select_zero_conv.weight = torch.nn.Parameter(torch.tensor([[[[-1]]]], dtype=torch.float32))
-        self.select_zero_conv.bias = torch.nn.Parameter(torch.tensor([1], dtype=torch.float32))
+        self.select_zero_conv.weight = torch.nn.Parameter(torch.tensor([[[[-1]]]], dtype=dtype))
+        self.select_zero_conv.bias = torch.nn.Parameter(torch.tensor([1], dtype=dtype))
         self.zeros_relu = nn.ReLU()
 
         self.zeros_repeat_conv = nn.Conv2d(in_channels=1, out_channels=9, kernel_size=1)
-        self.zeros_repeat_conv.weight = torch.nn.Parameter(torch.tensor([[[[1]]]]*9, dtype=torch.float32))
-        self.zeros_repeat_conv.bias = torch.nn.Parameter(torch.tensor([0]*9, dtype=torch.float32))
+        self.zeros_repeat_conv.weight = torch.nn.Parameter(torch.tensor([[[[1]]]]*9, dtype=dtype))
+        self.zeros_repeat_conv.bias = torch.nn.Parameter(torch.tensor([0]*9, dtype=dtype))
 
         self.select_number1_conv = nn.Conv2d(in_channels=1, out_channels=9, kernel_size=1)
-        self.select_number1_conv.weight = torch.nn.Parameter(torch.tensor([[[[1]]]]*9, dtype=torch.float32))
-        self.select_number1_conv.bias = torch.nn.Parameter(torch.tensor([-x+1 for x in range(1,10)], dtype=torch.float32))
+        self.select_number1_conv.weight = torch.nn.Parameter(torch.tensor([[[[1]]]]*9, dtype=dtype))
+        self.select_number1_conv.bias = torch.nn.Parameter(torch.tensor([-x+1 for x in range(1,10)], dtype=dtype))
         self.select_number1_relu = nn.ReLU()
 
         self.select_number2_conv = nn.Conv2d(in_channels=1, out_channels=9, kernel_size=1)
-        self.select_number2_conv.weight = torch.nn.Parameter(torch.tensor([[[[-1]]]]*9, dtype=torch.float32))
-        self.select_number2_conv.bias = torch.nn.Parameter(torch.tensor([x+1 for x in range(1,10)], dtype=torch.float32))
+        self.select_number2_conv.weight = torch.nn.Parameter(torch.tensor([[[[-1]]]]*9, dtype=dtype))
+        self.select_number2_conv.bias = torch.nn.Parameter(torch.tensor([x+1 for x in range(1,10)], dtype=dtype))
         self.select_number2_relu = nn.ReLU()
         pass
 
@@ -68,17 +71,17 @@ class SudokuNumbersInCellOld(nn.Module):
 для каждого из прямоугольников смотрим на числа от 0..9 и если у нас есть одно и только одно число (или точнее number_to_compare),
 то выставляем 1. Впринципе всё элементарно - надо просуммировать и сравнить с number_to_compare.
     '''
-    def __init__(self, number_to_compare=1.):
+    def __init__(self, number_to_compare, dtype):
         super(SudokuNumbersInCellOld,self).__init__()
 
         self.select_number1_conv = nn.Conv2d(in_channels=9, out_channels=1, kernel_size=1)
-        self.select_number1_conv.weight = torch.nn.Parameter(torch.tensor([[[[1]]]*9], dtype=torch.float32))
-        self.select_number1_conv.bias = torch.nn.Parameter(torch.tensor([-number_to_compare+1], dtype=torch.float32))
+        self.select_number1_conv.weight = torch.nn.Parameter(torch.tensor([[[[1]]]*9], dtype=dtype))
+        self.select_number1_conv.bias = torch.nn.Parameter(torch.tensor([-number_to_compare+1], dtype=dtype))
         self.select_number1_relu = nn.ReLU()
 
         self.select_number2_conv = nn.Conv2d(in_channels=9, out_channels=1, kernel_size=1)
-        self.select_number2_conv.weight = torch.nn.Parameter(torch.tensor([[[[-1]]]*9], dtype=torch.float32))
-        self.select_number2_conv.bias = torch.nn.Parameter(torch.tensor([number_to_compare+1], dtype=torch.float32))
+        self.select_number2_conv.weight = torch.nn.Parameter(torch.tensor([[[[-1]]]*9], dtype=dtype))
+        self.select_number2_conv.bias = torch.nn.Parameter(torch.tensor([number_to_compare+1], dtype=dtype))
         self.select_number2_relu = nn.ReLU()
         pass
 
@@ -92,13 +95,13 @@ class SudokuNumbersInCell(nn.Module):
 для каждого из прямоугольников смотрим на числа от 0..9 и если у нас есть одно и только одно число (или точнее number_to_compare),
 то выставляем 1. Впринципе всё элементарно - надо просуммировать и сравнить с number_to_compare.
     '''
-    def __init__(self, number_to_compare=1.):
+    def __init__(self, number_to_compare, dtype, device):
         super(SudokuNumbersInCell,self).__init__()
         self.number_to_compare = number_to_compare
 
         self.select_number_conv = nn.Conv2d(in_channels=9, out_channels=1, kernel_size=1)
-        self.select_number_conv.weight = torch.nn.Parameter(torch.ones((1,9,1,1), dtype=torch.float32))
-        self.select_number_conv.bias = torch.nn.Parameter(torch.zeros(1, dtype=torch.float32))
+        self.select_number_conv.weight = torch.nn.Parameter(torch.ones((1,9,1,1), dtype=dtype, device=device))
+        self.select_number_conv.bias = torch.nn.Parameter(torch.zeros(1, dtype=dtype, device=device))
         pass
 
     def forward(self, x : torch.Tensor) -> torch.Tensor:
@@ -112,27 +115,27 @@ class SudokuSumDownsample:
     Уменьшает элементы но горизонтали/вертикали/box3x3 и суммирует.
     Потом можно обратно увеличить.
     '''
-    def __init__(self, type : str, channels=9):
+    def __init__(self, type : str, dtype, device, channels=9):
         if type=='h':
             #horizontal
             self.select_sum_conv = nn.Conv2d(in_channels=channels, out_channels=channels, kernel_size=(1, 9), groups=channels)
-            self.select_sum_conv.weight = torch.nn.Parameter(torch.tensor([[[[1]*9]]]*channels, dtype=torch.float32))
-            self.select_sum_conv.bias = torch.nn.Parameter(torch.zeros(channels, dtype=torch.float32))
+            self.select_sum_conv.weight = torch.nn.Parameter(torch.tensor([[[[1]*9]]]*channels, dtype=dtype, device=device))
+            self.select_sum_conv.bias = torch.nn.Parameter(torch.zeros(channels, dtype=dtype, device=device))
             self.upsample = nn.UpsamplingNearest2d(scale_factor=(1,9))
         elif type=='v':
             #vertical
             self.select_sum_conv = nn.Conv2d(in_channels=channels, out_channels=channels, kernel_size=(9, 1), groups=channels)
             #print(f"{self.select_sum_conv.weight.shape=}")
-            self.select_sum_conv.weight = torch.nn.Parameter(torch.tensor([[[[1]]*9]]*channels, dtype=torch.float32))
+            self.select_sum_conv.weight = torch.nn.Parameter(torch.tensor([[[[1]]*9]]*channels, dtype=dtype, device=device))
             #print(f"{self.select_sum_conv.weight.shape=}")
-            self.select_sum_conv.bias = torch.nn.Parameter(torch.zeros(channels, dtype=torch.float32))
+            self.select_sum_conv.bias = torch.nn.Parameter(torch.zeros(channels, dtype=dtype, device=device))
             self.upsample = nn.UpsamplingNearest2d(scale_factor=(9,1))
         elif type=='box':
             #box
             self.use_upsample3 = True
             self.select_sum_conv = nn.Conv2d(in_channels=channels, out_channels=channels, kernel_size=3, stride=3, groups=channels)
-            self.select_sum_conv.weight = torch.nn.Parameter(torch.tensor([[[[1]*3]*3]]*channels, dtype=torch.float32))
-            self.select_sum_conv.bias = torch.nn.Parameter(torch.zeros(channels, dtype=torch.float32))
+            self.select_sum_conv.weight = torch.nn.Parameter(torch.tensor([[[[1]*3]*3]]*channels, dtype=dtype, device=device))
+            self.select_sum_conv.bias = torch.nn.Parameter(torch.zeros(channels, dtype=dtype, device=device))
             self.upsample = nn.UpsamplingNearest2d(scale_factor=3)
             pass
         else:
@@ -163,11 +166,11 @@ type = "h" | "v" | "box"
 И UpsamplingNearest2d вместо expand_as
 
     '''
-    def __init__(self, type : str):
+    def __init__(self, type : str, dtype, device):
         super(SudokuFilterHVBox,self).__init__()
 
-        self.numbers_in_cell = SudokuNumbersInCell()
-        self.sum_downsample = SudokuSumDownsample(type)
+        self.numbers_in_cell = SudokuNumbersInCell(number_to_compare=1, dtype=dtype, device=device)
+        self.sum_downsample = SudokuSumDownsample(type, dtype=dtype, device=device)
 
     def forward(self, mask : torch.Tensor) -> torch.Tensor:
         exact_cells = self.numbers_in_cell(mask)
@@ -190,13 +193,13 @@ class  SudokuUniqueHVBox(nn.Module):
 Класс, который проверяет. Если число есть только в одной из ячеек, то значит оно может быть только в этой ячейке.
 Это даст возможность medium решать.
     '''
-    def __init__(self, type : str):
+    def __init__(self, type : str, dtype, device):
         super(SudokuUniqueHVBox,self).__init__()
-        self.sum_downsample = SudokuSumDownsample(type)
+        self.sum_downsample = SudokuSumDownsample(type, dtype=dtype, device=device)
 
         self.uniq_cell_conv = nn.Conv2d(in_channels=9, out_channels=1, kernel_size=1)
-        self.uniq_cell_conv.weight = torch.nn.Parameter(torch.tensor([[[[-1]]]*9], dtype=torch.float32))
-        self.uniq_cell_conv.bias = torch.nn.Parameter(torch.tensor([1], dtype=torch.float32))
+        self.uniq_cell_conv.weight = torch.nn.Parameter(torch.tensor([[[[-1]]]*9], dtype=dtype, device=device))
+        self.uniq_cell_conv.bias = torch.nn.Parameter(torch.tensor([1], dtype=dtype, device=device))
         self.uniq_cell_conv_relu = nn.ReLU()
 
     def forward(self, mask : torch.Tensor) -> torch.Tensor:
@@ -225,13 +228,13 @@ class  SudokuUniqueHVBox(nn.Module):
 
 class  SudokuIsEqual(nn.Module):
     ''' Сравнивает, что две маски одинаковые. Т.е. решение не продвинулось дальше'''
-    def __init__(self):
+    def __init__(self, dtype, device):
         super(SudokuIsEqual,self).__init__()
         self.sum_all = nn.Conv2d(in_channels=9, out_channels=1, kernel_size=9)
         #print(f"{self.sum_all.weight.shape=}")
         #print(f"{self.sum_all.bias.shape=}")
-        self.sum_all.weight = torch.nn.Parameter(torch.tensor([[[[1]*9]*9]*9], dtype=torch.float32))
-        self.sum_all.bias = torch.nn.Parameter(torch.zeros(1, dtype=torch.float32))
+        self.sum_all.weight = torch.nn.Parameter(torch.tensor([[[[1]*9]*9]*9], dtype=dtype, device=device))
+        self.sum_all.bias = torch.nn.Parameter(torch.zeros(1, dtype=dtype, device=device))
 
     def forward(self, mask1 : torch.Tensor, mask2 : torch.Tensor) -> torch.Tensor:
         return self.sum_all(torch.abs(torch.sub(mask1, mask2)))
@@ -244,14 +247,14 @@ class SudokuDigitsInOneLineAtBox(nn.Module):
 Потом у нас будет условие - что число находится в одной строке, но его нет в других.
 Имея такую маску мы можем её инвертировать и пройтись по другим box в этой строке.
     '''
-    def __init__(self, type):
+    def __init__(self, type, dtype, device):
         super(SudokuDigitsInOneLineAtBox,self).__init__()
         if type=='h':
             #horizontal
             self.pool_line = nn.MaxPool2d(kernel_size=(1,3))
             self.select_sum_opposite = nn.Conv2d(in_channels=9, out_channels=9, kernel_size=(3,1), groups=9, stride=(3,1))
-            self.select_sum_opposite.weight = torch.nn.Parameter(torch.tensor([[[[-1]]*3]]*9, dtype=torch.float32))
-            self.select_sum_opposite.bias = torch.nn.Parameter(torch.tensor([2]*9, dtype=torch.float32))
+            self.select_sum_opposite.weight = torch.nn.Parameter(torch.tensor([[[[-1]]*3]]*9, dtype=dtype, device=device))
+            self.select_sum_opposite.bias = torch.nn.Parameter(torch.tensor([2]*9, dtype=dtype, device=device))
             self.pool_opposite = nn.MaxPool2d(kernel_size=(1,3))
             self.upsample_opposite = nn.UpsamplingNearest2d(scale_factor=(3,1))
             self.upsample_negate = nn.UpsamplingNearest2d(scale_factor=(1,3))
@@ -259,8 +262,8 @@ class SudokuDigitsInOneLineAtBox(nn.Module):
             #vertical
             self.pool_line = nn.MaxPool2d(kernel_size=(3,1))
             self.select_sum_opposite = nn.Conv2d(in_channels=9, out_channels=9, kernel_size=(1,3), groups=9, stride=(1,3))
-            self.select_sum_opposite.weight = torch.nn.Parameter(torch.tensor([[[[-1]*3]]]*9, dtype=torch.float32))
-            self.select_sum_opposite.bias = torch.nn.Parameter(torch.tensor([2]*9, dtype=torch.float32))
+            self.select_sum_opposite.weight = torch.nn.Parameter(torch.tensor([[[[-1]*3]]]*9, dtype=dtype, device=device))
+            self.select_sum_opposite.bias = torch.nn.Parameter(torch.tensor([2]*9, dtype=dtype, device=device))
             self.pool_opposite = nn.MaxPool2d(kernel_size=(3,1))
             self.upsample_opposite = nn.UpsamplingNearest2d(scale_factor=(1,3))
             self.upsample_negate = nn.UpsamplingNearest2d(scale_factor=(3,1))
@@ -291,9 +294,9 @@ class SudokuDigitsDoubles(nn.Module):
 Класс, который проверяет в horizontal, vertical, box. Если есть две ячейки в которых 2 одинаковых числа,
 то в этом случае значит в других ячейках этих чисел нет.
     '''
-    def __init__(self, type):
+    def __init__(self, type, dtype, device):
         super(SudokuDigitsDoubles,self).__init__()
-        self.sum_downsample36 = SudokuSumDownsample(type, channels=36)
+        self.sum_downsample36 = SudokuSumDownsample(type, channels=36, dtype=dtype, device=device)
 
         count = 0
         encode_permutations_np = np.zeros((36,9))
@@ -307,20 +310,20 @@ class SudokuDigitsDoubles(nn.Module):
                 decode_permutations_np[j,count] = 1.
                 count += 1
         assert count==36
-        encode_permutations = torch.tensor(encode_permutations_np, dtype=torch.float32).unsqueeze(2).unsqueeze(3)
-        decode_permutations = torch.tensor(decode_permutations_np, dtype=torch.float32).unsqueeze(2).unsqueeze(3)
+        encode_permutations = torch.tensor(encode_permutations_np, dtype=dtype, device=device).unsqueeze(2).unsqueeze(3)
+        decode_permutations = torch.tensor(decode_permutations_np, dtype=dtype, device=device).unsqueeze(2).unsqueeze(3)
 
         self.sum_permutations = nn.Conv2d(in_channels=9, out_channels=36, kernel_size=1)
         self.sum_permutations.weight = torch.nn.Parameter(encode_permutations)
-        self.sum_permutations.bias = torch.nn.Parameter(torch.zeros(36, dtype=torch.float32))
+        self.sum_permutations.bias = torch.nn.Parameter(torch.zeros(36, dtype=dtype, device=device))
 
         self.decode_permutations = nn.Conv2d(in_channels=36, out_channels=9, kernel_size=1)
         self.decode_permutations.weight = torch.nn.Parameter(decode_permutations)
-        self.decode_permutations.bias = torch.nn.Parameter(torch.zeros(9, dtype=torch.float32))
+        self.decode_permutations.bias = torch.nn.Parameter(torch.zeros(9, dtype=dtype, device=device))
 
         self.sum_all_permutations = nn.Conv2d(in_channels=36, out_channels=1, kernel_size=1)
-        self.sum_all_permutations.weight = torch.nn.Parameter(torch.ones((1,36,1,1), dtype=torch.float32))
-        self.sum_all_permutations.bias = torch.nn.Parameter(torch.zeros(1, dtype=torch.float32))
+        self.sum_all_permutations.weight = torch.nn.Parameter(torch.ones((1,36,1,1), dtype=dtype, device=device))
+        self.sum_all_permutations.bias = torch.nn.Parameter(torch.zeros(1, dtype=dtype, device=device))
         
 
     def forward(self, mask : torch.Tensor, return_erase=False) -> torch.Tensor:
@@ -348,9 +351,33 @@ class SudokuDigitsDoubles(nn.Module):
             return erase_mask
         return NNAnd(mask, NNNot(erase_mask))
 
-'''
-Класс, который проверяет, что sudoku решилось, либо нет возможности решить.
-'''
+class SudokuSolved(nn.Module):
+    ''' Класс, который проверяет, что sudoku решилось, либо нет возможности решить.'''
+    def __init__(self, dtype, device):
+        super(SudokuSolved,self).__init__()
+        self.ones_in_cell = SudokuNumbersInCell(number_to_compare=1, dtype=dtype, device=device)
+        self.zeros_in_cell = SudokuNumbersInCell(number_to_compare=0, dtype=dtype, device=device)
+
+        self.sum_9x9 = nn.Conv2d(in_channels=1, out_channels=1, kernel_size=9)
+        self.sum_9x9.weight = torch.nn.Parameter(torch.ones((1,1,9,9), dtype=dtype, device=device))
+        self.sum_9x9.bias = torch.nn.Parameter(torch.zeros(1, dtype=dtype, device=device))
+
+        self.max_9x9 = nn.MaxPool2d(kernel_size=9)
+
+    def forward(self, mask : torch.Tensor) -> torch.Tensor:
+        determine_mask = self.ones_in_cell(mask)
+        #количество однозначных ячеек
+        determine_sum = self.sum_9x9(determine_mask)
+        #если все 81 ячейка разрешены, значит судоку решилось
+        is_resolved = NNCompare(determine_sum, 81)
+
+        zeros_mask = self.zeros_in_cell(mask)
+        #если хоть в одной из ячеек ничего нельзя разместить,
+        #то судоку не решилось
+        zeros_max = self.max_9x9(zeros_mask)
+
+        #первое число - решено ли sudoku, второе число - решаемо ли судоку
+        return is_resolved.squeeze(), zeros_max.squeeze()
 
 '''
 Этого должно хватить для решения простых hardest судоку.
@@ -359,7 +386,23 @@ class SudokuDigitsDoubles(nn.Module):
 Неправильное решение отбрасывать через определённое количество шагов.
 '''
 
-'''
-Возможность отображать 2 параллельных решения на одной доске.
-Пускай одно будет зелёными цифирками, а другое - красными.
-'''
+def sudoku_to_mask(sudoku, dtype):
+    '''Конвертирует судоку в маску'''
+    conv_sudoku = ConvSudokuTextToBits(dtype=dtype)
+
+    if isinstance(sudoku, bytes):
+        assert len(sudoku)==81
+        input = np.frombuffer(sudoku, dtype=np.int8)
+        input = np.reshape(input, newshape=(1,1,9,9))
+        input = torch.tensor(input, dtype=dtype)
+        return conv_sudoku(input)
+    elif isinstance(sudoku, list):
+        input = np.zeros(shape=(len(sudoku), 1, 9, 9))
+        for idx, line in enumerate(sudoku):
+            assert len(line)==81
+            input[idx, :, :, :] = np.reshape(np.frombuffer(line, dtype=np.int8), newshape=(1,9,9))
+
+        input = torch.tensor(input, dtype=dtype)
+        return conv_sudoku(input)
+    else:
+        assert 0
