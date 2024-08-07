@@ -147,6 +147,8 @@ class DrawSudoku:
                 s = "."
             else:
                 s = sudoku[i]
+                if ord(s)<ord('1') or ord(s)>ord('9'):
+                    s = "."
             x = i%9
             y = i//9
             cx, cy = self.cell_pos(x,y)

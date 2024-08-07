@@ -1,16 +1,18 @@
 from sudoku_stuff import *
 from sudoku_nn import *
 from time import time
+from torchsummary import summary
 
-#попробовать квантизацию
+#попробовать квантизацию (torch-tensorrt не смогло установиться :( )
 dtype=torch.float32
 device = torch.device("cuda", 0)
 #device = torch.device("cpu", 0)
-batch_size = 1000
+batch_size = 100000
 
 start_time = time()
 #sudoku = get_puzzle("data/puzzles0_kaggle", idx='all')
-sudoku = get_puzzle("data/puzzles2_17_clue", idx='all')
+sudoku = get_puzzle_csv(max_count=batch_size)
+#sudoku = get_puzzle("data/puzzles2_17_clue", idx='all')
 load_time = time()-start_time
 print(len(sudoku), f"load time = {load_time} sec")
 
@@ -23,11 +25,14 @@ for offset in range(0, len(sudoku), batch_size):
 sudoku_to_mask_time = time()-start_time
 print(f"to mask = {sudoku_to_mask_time} sec")
 
-#passes = SudokuPasses(dtype, device, passes=4, remove_doubles=False) #puzzles0_kaggle
-passes = SudokuPasses(dtype, device, passes=16, remove_doubles=True) #puzzles2_17_clue
+passes = SudokuPasses(dtype, device, passes=4, remove_doubles=False) #puzzles0_kaggle
+#passes = SudokuPasses(dtype, device, passes=16, remove_doubles=False)
+#passes = SudokuPasses(dtype, device, passes=16, remove_doubles=True) #puzzles2_17_clue
 passes.eval()
 
 with torch.no_grad():
+    #summary(passes, masks[0]); exit()
+
     start_time = time()
     mask_solved = passes(masks[0])
     print(f"first sovled = {time()-start_time} sec")
@@ -54,4 +59,5 @@ with torch.no_grad():
         mask_offset += mask.shape[0]
         pass
     percent_not_solved = sum_not_solved/len(sudoku)*100.
-    print(f"{sum_not_solved=} {percent_not_solved=:.1f}%")
+    percent_solved = 100-percent_not_solved
+    print(f"{sum_not_solved=} {percent_solved=:.1f}%")

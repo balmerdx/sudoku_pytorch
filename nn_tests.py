@@ -32,7 +32,7 @@ def draw(name="Initial", back_mask=None):
 #sudoku = b'........6.....6..1.675.29347.26.43953.572.6484.6.3517253826741967.45.82324....567' #data/puzzles2_17_clue 19 до состояния кода требуется двойка
 
 #sudoku = get_puzzle("data/puzzles0_kaggle")
-sudoku = get_puzzle("data/puzzles2_17_clue", 1006)
+#sudoku = get_puzzle("data/puzzles2_17_clue", 1006)
 #sudoku = get_puzzle("data/puzzles1_unbiased") #можно как hardest использовать не особо сложные
 #sudoku = get_puzzle("data/puzzles5_forum_hardest_1905_11+")
 
@@ -40,8 +40,10 @@ sudoku = get_puzzle("data/puzzles2_17_clue", 1006)
 #sudoku2 = b".68..5.9.7...12..6...86...287....3...92...51...3....671...83...6..59...3.5.7..18."
 
 #https://www.google.com/search?newwindow=1&client=ubuntu-sn&hs=rzG&sca_esv=e3ff2cacd83f1ace&channel=fs&sxsrf=ADLYWIK_uox5MzPdr9OSkR06N62CrL8Crg:1722364908241&q=Fastest+algorithm+to+solve+Sudoku&uds=ADvngMjvPWL3d2w2-NRjpDFznBOP8WBJNS0ErgI6af4zFntGhDeoodfxks_hG3knjbM5AAeRyq7yXMXaK2WdmMWDuQ-0Q4zNwaO43WVGyBAwF4OQv5JwtX-VFSpSPQS7kcVJAMYhYIK4zJGKcD0qtb59Eb4FufsgKg&sa=X&ved=2ahUKEwj1052ktc-HAxUWPxAIHZ6RGUMQxKsJegQIGhAB&ictx=0&biw=2490&bih=1328&dpr=1#fpstate=ive&vld=cid:592ceb4d,vid:gP5M1EoQe-4,st:0
-sudoku = b'.....6.7..5..8.6933.......2..9..1.4...25.38...7.6..2..6.......5543.6..8..9.1.....' #easy
-sudoku = b'95....67......731.8..561...23.........9...1.........37...145..9.942......85....21' #very hard
+#sudoku = b'.....6.7..5..8.6933.......2..9..1.4...25.38...7.6..2..6.......5543.6..8..9.1.....' #easy
+#sudoku = b'95....67......731.8..561...23.........9...1.........37...145..9.942......85....21' #very hard
+sudoku = b'004300209005009001070060043006002087190007400050083000600000105003508690042910300' #1 million
+sudoku = get_puzzle_csv(max_count=1000)[13]
 
 ds = DrawSudoku(enable_store_images=True)
 mask = sudoku_to_mask(sudoku, dtype=dtype)

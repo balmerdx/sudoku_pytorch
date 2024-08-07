@@ -293,6 +293,8 @@ class SudokuDigitsDoubles(nn.Module):
     '''
 Класс, который проверяет в horizontal, vertical, box. Если есть две ячейки в которых 2 одинаковых числа,
 то в этом случае значит в других ячейках этих чисел нет.
+Очень дорогой вычислительно класс. Если всё остальное занимает 0.02 MFlops,
+то этот класс использует более 2 MFlops на одну sudoku. Но он позволяет решать большую часть puzzles0_kaggle
     '''
     def __init__(self, type, dtype, device):
         super(SudokuDigitsDoubles,self).__init__()
