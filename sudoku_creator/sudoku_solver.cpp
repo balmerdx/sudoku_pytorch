@@ -1,7 +1,6 @@
 #include "sudoku_solver.h"
 #include <string.h>
 #include <chrono>
-#include <array>
 #include "file_utils.h"
 
 SudokuSolver::SudokuSolver() {}
@@ -28,10 +27,12 @@ int SudokuSolver::is_only_one(uint32_t d)
 void SudokuSolver::solve()
 {
     steps_count = 0;
-    solve_rec(0, 0, 0);
+    std::array<bool, 81> empty_mask;
+    std::fill( std::begin( empty_mask ), std::end( empty_mask ), false );
+    solve_rec(0, empty_mask);
 }
 
-bool SudokuSolver::solve_rec(int x, int y, int recursion)
+bool SudokuSolver::solve_rec(int recursion, const std::array<bool, 81>& recursion_mask)
 {
     while(true)
     {
@@ -82,21 +83,33 @@ bool SudokuSolver::solve_rec(int x, int y, int recursion)
             if(memcmp(data_prev, data, sizeof(data))==0)
             {
                 //Ничего не смогли нарешать, надо рекурсивно выставить какое либо из чисел в одно из валидных.
-                while(true)
+                int x=0,y=0;
+                int bits = 10;
+                for(int yy=0; yy<9; yy++)
                 {
-                    int v = is_only_one(x, y);
-                    if(v<0)
-                        break;
-                    x++;
-                    if(x==9)
+                    for(int xx=0; xx<9; xx++)
                     {
-                        x = 0;
-                        y++;
+                        if(recursion_mask[yy*9+xx])
+                            continue;
+
+                        int b = bits_count(data[yy][xx]);
+                        if(b==1)
+                            continue;
+                        if(b>=bits)
+                            continue;
+                        x = xx;
+                        y = yy;
+                        bits = b;
+                        if(bits==2)
+                            break;
                     }
 
-                    if(!(x<9 && y<9))
-                        return false;
+                    if(bits==2)
+                        break;
                 }
+
+                if(bits>=10)
+                    return false;
 
                 memcpy(data_prev, data, sizeof(data));
                 auto v = data[y][x];
@@ -110,7 +123,10 @@ bool SudokuSolver::solve_rec(int x, int y, int recursion)
                             printf("Try %i at (%i,%i) ", j+1, x,y);
                             print_partial(recursion, steps_count);
                         }
-                        if(solve_rec(x, y, recursion+1))
+
+                        std::array<bool, 81> recursion_mask1 = recursion_mask;
+                        recursion_mask1[y*9+x] = true;
+                        if(solve_rec(recursion+1, recursion_mask1))
                             return true;
                         memcpy(data, data_prev, sizeof(data));
                     }

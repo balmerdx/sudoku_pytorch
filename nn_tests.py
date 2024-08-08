@@ -28,11 +28,13 @@ def draw(name="Initial", back_mask=None):
 #sudoku = b'6154...8.8321.54.69476382157.628.1..4.83516..3.17.68..18356...4.649......798...6.' #hard двойка одинаковых чисел почти решённая
 #sudoku = b"5..6....3.....3.2.9..2.7.8...8....32..43..9.5..9....688..7.2.5......4.7.7..9....6" #veryhard
 #sudoku = b"8.........95.......76.........426798...571243...893165......916....3.487....1.532" #puzzles7_serg_benchmark extra hard
+#sudoku = b".................1.....2.3......3.2...1.4......5....6..3......4.7..8...962...7..." #data/puzzles2_17_clue 0
 #sudoku = b'.................1.....2.34.....4.....5...6....6.3.....3..6.....7..5.8..24......7' #data/puzzles2_17_clue 19 требуется двойка одинаковых чисел
 #sudoku = b'........6.....6..1.675.29347.26.43953.572.6484.6.3517253826741967.45.82324....567' #data/puzzles2_17_clue 19 до состояния кода требуется двойка
+sudoku = b"..3.7..4...6..23.1.89.........1.7.8.517.....6...4.....271..9..5.95..........2...." #puzzles1_unbiased 0
 
 #sudoku = get_puzzle("data/puzzles0_kaggle")
-#sudoku = get_puzzle("data/puzzles2_17_clue", 1006)
+#sudoku = get_puzzle("data/puzzles2_17_clue", 1)
 #sudoku = get_puzzle("data/puzzles1_unbiased") #можно как hardest использовать не особо сложные
 #sudoku = get_puzzle("data/puzzles5_forum_hardest_1905_11+")
 
@@ -42,8 +44,8 @@ def draw(name="Initial", back_mask=None):
 #https://www.google.com/search?newwindow=1&client=ubuntu-sn&hs=rzG&sca_esv=e3ff2cacd83f1ace&channel=fs&sxsrf=ADLYWIK_uox5MzPdr9OSkR06N62CrL8Crg:1722364908241&q=Fastest+algorithm+to+solve+Sudoku&uds=ADvngMjvPWL3d2w2-NRjpDFznBOP8WBJNS0ErgI6af4zFntGhDeoodfxks_hG3knjbM5AAeRyq7yXMXaK2WdmMWDuQ-0Q4zNwaO43WVGyBAwF4OQv5JwtX-VFSpSPQS7kcVJAMYhYIK4zJGKcD0qtb59Eb4FufsgKg&sa=X&ved=2ahUKEwj1052ktc-HAxUWPxAIHZ6RGUMQxKsJegQIGhAB&ictx=0&biw=2490&bih=1328&dpr=1#fpstate=ive&vld=cid:592ceb4d,vid:gP5M1EoQe-4,st:0
 #sudoku = b'.....6.7..5..8.6933.......2..9..1.4...25.38...7.6..2..6.......5543.6..8..9.1.....' #easy
 #sudoku = b'95....67......731.8..561...23.........9...1.........37...145..9.942......85....21' #very hard
-sudoku = b'004300209005009001070060043006002087190007400050083000600000105003508690042910300' #1 million
-sudoku = get_puzzle_csv(max_count=1000)[13]
+#sudoku = b'004300209005009001070060043006002087190007400050083000600000105003508690042910300' #1 million
+#sudoku = get_puzzle_csv(max_count=1000)[13]
 
 ds = DrawSudoku(enable_store_images=True)
 mask = sudoku_to_mask(sudoku, dtype=dtype)

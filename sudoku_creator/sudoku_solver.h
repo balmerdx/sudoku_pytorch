@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include <stdint.h>
+#include <array>
 
 /*
     Судоку - это строчка на 81 char
@@ -55,7 +56,7 @@ public:
     int is_only_one(uint32_t d);
 
     void solve();
-    bool solve_rec(int x, int y, int recursion);
+    bool solve_rec(int recursion, const std::array<bool, 81>& recursion_mask);
 
     //Берём точно определённые числа, находящихся на этой линии.
     //В остальных ячейках этих чисел быть не должно.
