@@ -27,6 +27,7 @@ int SudokuSolver::is_only_one(uint32_t d)
 void SudokuSolver::solve()
 {
     steps_count = 0;
+    recursion_count = 0;
     std::array<bool, 81> empty_mask;
     std::fill( std::begin( empty_mask ), std::end( empty_mask ), false );
     solve_rec(0, empty_mask);
@@ -34,6 +35,7 @@ void SudokuSolver::solve()
 
 bool SudokuSolver::solve_rec(int recursion, const std::array<bool, 81>& recursion_mask)
 {
+    recursion_count++;
     while(true)
     {
         steps_count++;
@@ -562,7 +564,7 @@ std::string sudoku_solve(const std::string& initial_data, bool print_solve_time,
     {
         stop = std::chrono::steady_clock::now();
         double nano_seconds = (stop-start).count();
-        printf("Solve time=%.1f us steps=%i\n", nano_seconds*1e-3, s.steps_count);
+        printf("Solve time=%.1f us steps=%i recursion=%i\n", nano_seconds*1e-3, s.steps_count, s.recursion_count);
     }
 
     return s.to_string();

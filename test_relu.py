@@ -1,3 +1,8 @@
+import numpy as np
+import torch
+import torch.nn as nn
+from sudoku_nn import *
+
 '''
 #Как при помощи relu(+-x+bias) для конкретного числа получить 1?
 
@@ -19,10 +24,6 @@ for x in range(6):
 '''
 
 '''
-import numpy as np
-import torch
-import torch.nn as nn
-from sudoku_nn import *
 
 #negate_mask единичная, если у нас есть только одна строка (в box) с этим числом
 #надо переносить маску на другие box горизонтально, т.е. для первого столбца перенести во второй и третий
@@ -47,9 +48,56 @@ print(f"{line_mask.shape=} -> {negate_mask.shape=}")
 pass
 '''
 
+'''
 count = 0
 for i in range(0,8):
     for j in range(i+1, 9):
         print(i,j)
         count += 1
 print(count)
+'''
+
+'''
+input = torch.rand(1, 1, 9, 9)
+print(input.numpy())
+
+max_pool = nn.MaxPool2d(9, return_indices=True)
+max_unpool = nn.MaxUnpool2d(9)
+out, out_indices = max_pool(input)
+print(out.numpy())
+print("indices =",out_indices)
+print("indices type =",type(out_indices))
+
+out2 = max_unpool(out, out_indices)
+
+print(out2.numpy())
+'''
+
+'''
+input = torch.mul(torch.rand(1, 1, 3, 3), 10)
+iterator = Iterate2D(kernel_size=input.shape[3])
+mask, index = None, None
+for i in range(10):
+    mask, index, data = iterator(input, mask, index)
+    print(f"data={data.item()} index={index.item()-1}")
+    print(mask.numpy())
+
+'''
+
+'''
+input = torch.rand(1, 3, 3, 3)
+input = torch.round(input)
+one_variant = SudokuSelectOneVariant(device=input.device, kernel_size=input.shape[1])
+print(input)
+out = one_variant(input)
+print(out)
+'''
+
+sudoku = torch.round(torch.rand(1, 3, 3, 3))
+iterate = SudokuIterate(device=sudoku.device, kernel_size=sudoku.shape[1])
+print(sudoku)
+
+recursion_mask, recursion_index = None, None
+for i in range(16):
+    sudoku, recursion_mask, recursion_index = iterate(sudoku, recursion_mask, recursion_index)
+    print(sudoku)

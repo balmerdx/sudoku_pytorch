@@ -20,6 +20,7 @@ public:
     static constexpr int xbox[9]={0,1,2,0,1,2,0,1,2};
     static constexpr int ybox[9]={0,0,0,1,1,1,2,2,2};
     int steps_count;
+    int recursion_count;
     bool print_all = false;
 
     enum class LType

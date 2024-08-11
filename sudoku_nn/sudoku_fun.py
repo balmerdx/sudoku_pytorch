@@ -18,8 +18,8 @@ def NNNot(x):
 def NNCompare(x, value):
     #зануляем числа меньше x
     a = nn.functional.relu(torch.add(x, -value+1))
-    b = nn.functional.relu(torch.sub(value+1, x))
     #зануляем числа больше x
+    b = nn.functional.relu(torch.sub(value+1, x))
     return torch.fmin(a,b)
 
 class ConvSudokuTextToBits(nn.Module):
