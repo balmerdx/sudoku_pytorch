@@ -3,24 +3,31 @@ import torch.nn as nn
 import numpy as np
 
 @torch.no_grad()
-def NNOr(x,y):
+def NNOr(x : torch.Tensor, y : torch.Tensor):
     return torch.clamp(torch.fmax(x,y), 0, 1)
 
 @torch.no_grad()
-def NNAnd(x,y):
+def NNAnd(x : torch.Tensor, y : torch.Tensor):
     return torch.clamp(torch.fmin(x,y), 0, 1)
 
 @torch.no_grad()
-def NNNot(x):
+def NNNot(x : torch.Tensor):
     return torch.sub(1, x)
 
 @torch.no_grad()
-def NNCompare(x, value):
+def NNCompare(x : torch.Tensor, value : float):
     #зануляем числа меньше x
     a = nn.functional.relu(torch.add(x, -value+1))
     #зануляем числа больше x
     b = nn.functional.relu(torch.sub(value+1, x))
     return torch.fmin(a,b)
+
+def NNSelect(x0 : torch.Tensor, x1 : torch.Tensor, selector : torch.Tensor):
+    '''
+    Если selector==0, то выбирается x0
+    Если selector==1, то выбирается x1
+    '''
+    return torch.lerp(x0, x1, selector)
 
 class ConvSudokuTextToBits(nn.Module):
     '''

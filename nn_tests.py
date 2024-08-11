@@ -26,13 +26,13 @@ def draw(name="Initial", back_mask=None):
 #sudoku = b".....8.568...92...1.....28.7.6....1..8.9.6.4..1....9.2.48.....7...24...595.6....." #hard
 #sudoku = b".......8...21.....947.3...57.62..1......5....3.17..8..183.6...4..49............6." #hard двойка одинаковых чисел
 #sudoku = b'6154...8.8321.54.69476382157.628.1..4.83516..3.17.68..18356...4.649......798...6.' #hard двойка одинаковых чисел почти решённая
-#sudoku = b"5..6....3.....3.2.9..2.7.8...8....32..43..9.5..9....688..7.2.5......4.7.7..9....6" #veryhard
+sudoku = b"5..6....3.....3.2.9..2.7.8...8....32..43..9.5..9....688..7.2.5......4.7.7..9....6" #veryhard
 #sudoku = b"8.........95.......76.........426798...571243...893165......916....3.487....1.532" #puzzles7_serg_benchmark extra hard
 #sudoku = b".................1.....2.3......3.2...1.4......5....6..3......4.7..8...962...7..." #data/puzzles2_17_clue 0
 #sudoku = b'.................1.....2.34.....4.....5...6....6.3.....3..6.....7..5.8..24......7' #data/puzzles2_17_clue 19 требуется двойка одинаковых чисел
 #sudoku = b'........6.....6..1.675.29347.26.43953.572.6484.6.3517253826741967.45.82324....567' #data/puzzles2_17_clue 19 до состояния кода требуется двойка
 #sudoku = b"..3.7..4...6..23.1.89.........1.7.8.517.....6...4.....271..9..5.95..........2...." #puzzles1_unbiased 0
-sudoku = b"7..51...3..8...7.....4.......6....9.3...7.2...8...4..1.....26.........4.5.9.8...." #tdoku build/generate -p0 -c0 -g1 -d1 -n100 -e50 -s0
+#sudoku = b"7..51...3..8...7.....4.......6....9.3...7.2...8...4..1.....26.........4.5.9.8...." #tdoku build/generate -p0 -c0 -g1 -d1 -n100 -e50 -s0
 
 #sudoku = get_puzzle("data/puzzles0_kaggle")
 #sudoku = get_puzzle("data/puzzles2_17_clue", 1)
@@ -67,6 +67,9 @@ doubles_v = SudokuDigitsDoubles("v", dtype=dtype, device=device).to(device)
 doubles_box = SudokuDigitsDoubles("box", dtype=dtype, device=device).to(device)
 
 sudoku_solved = SudokuSolved(dtype=dtype, device=device).to(device)
+sudoku_recursion = SudokuRecursionControl(device=device).to(device)
+
+recursion_mask, recursion_index = sudoku_recursion.create_masks(mask)
 
 draw()
 
@@ -77,8 +80,8 @@ for idx in range(15):
         is_equal = sudoku_equal(new_mask, mask)
         mask = new_mask
         #всегда рисуем, если у нас параллельно два судоку решается
-        if is_equal.shape[0]>1 or is_equal.item() > 0:
-            draw(f"{idx} {name}")
+        #if is_equal.shape[0]>1 or is_equal.item() > 0:
+        #    draw(f"{idx} {name}")
 
     '''
     #remove_h, remove_v видимо не нужны, они в более общем виде
@@ -86,6 +89,7 @@ for idx in range(15):
     one_pass(remove_h, 'remove_h')
     one_pass(remove_v, 'remove_v')
     '''
+    mask_old = mask
 
     one_pass(remove_box, 'remove_box')
     one_pass(digits_in_one_line_at_box_h, 'digits_in_one_line_at_box_h')
@@ -99,7 +103,7 @@ for idx in range(15):
     test_hints = NNOr(test_hints, doubles_v(mask, True))
     test_hints = NNOr(test_hints, doubles_h(mask, True))
 
-    draw(f"{idx} uniq_h uniq_v uniq_box", test_hints)
+    #draw(f"{idx} uniq_h uniq_v uniq_box", test_hints)
 
     if mask.shape[0]==1:
         print(hints_to_str(mask))
@@ -110,5 +114,10 @@ for idx in range(15):
 
     is_resolved, zeros_max = sudoku_solved(mask)
     print(f"is_resolved={is_resolved.item()} zeros_max={zeros_max.item()}")
+
+    draw(f"{idx} before recursion", test_hints)
+    mask, recursion_mask, recursion_index = sudoku_recursion(mask_old, mask, recursion_mask, recursion_index)
+    draw(f"{idx} sudoku_recursion", test_hints)
+
     pass
     

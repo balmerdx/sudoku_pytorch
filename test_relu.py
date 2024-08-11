@@ -93,11 +93,58 @@ out = one_variant(input)
 print(out)
 '''
 
-sudoku = torch.round(torch.rand(1, 3, 3, 3))
+'''
+device = torch.device("cuda", 0)
+
+input = torch.round(torch.rand(1, 3, 4, device=device)*3)
+print(input.cpu().numpy())
+
+kernel_size = input.shape[2]
+max_pool = nn.MaxPool1d(kernel_size, return_indices=True)
+max_unpool = nn.MaxUnpool1d(kernel_size)
+
+out = torch.tensor([[[7.77],[3.9],[4.5]]], dtype=torch.float32, device=device)
+out_indices = torch.tensor([[[1],[2],[3]]], dtype=torch.int64, device=device)
+print(out.cpu().numpy())
+print("indices =",out_indices)
+print("indices dtype =", out_indices.dtype)
+
+out2 = max_unpool(out, out_indices)
+
+print(out2.cpu().numpy())
+'''
+
+#sudoku = torch.round(torch.rand(1, 3, 3, 3))
+sudoku = torch.ones(1, 3, 3, 3)
 iterate = SudokuIterate(device=sudoku.device, kernel_size=sudoku.shape[1])
+iterate_rev = SudokuIterateRevert(device=sudoku.device, kernel_size=sudoku.shape[1])
+iterate_append = SudokuIterateAppend(device=sudoku.device, kernel_size=sudoku.shape[1])
 print(sudoku)
 
+sudokus = []
+
 recursion_mask, recursion_index = None, None
-for i in range(16):
+iterations = 5
+for i in range(iterations):
+    sudokus.append(sudoku)
     sudoku, recursion_mask, recursion_index = iterate(sudoku, recursion_mask, recursion_index)
+    #print(sudoku)
+    sudoku_cleared_bits = torch.round(torch.mul(torch.rand(sudoku.shape),0.6))
+    sudoku_cleared_bits = NNAnd(sudoku_cleared_bits, sudoku)
+    #print(sudoku_cleared_bits)
+    sudoku_new = NNAnd(sudoku, NNNot(sudoku_cleared_bits))
+    recursion_mask = iterate_append(sudoku, sudoku_new, recursion_mask, torch.sub(recursion_index,1))
+    #print(recursion_mask)
+    sudoku = sudoku_new
     print(sudoku)
+    pass
+
+#print(recursion_mask)
+for i in range(iterations):
+    sudoku, recursion_mask, recursion_index = iterate_rev(sudoku, recursion_mask, recursion_index)
+    comared = torch.max(torch.abs(torch.sub(sudokus[iterations-1-i], sudoku))).item()
+    print(f"{comared=}")
+    #print(recursion_mask)
+    #print(sudokus[iterations-1-i])
+    print(sudoku)
+    pass
