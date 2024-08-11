@@ -234,7 +234,10 @@ class  SudokuUniqueHVBox(nn.Module):
         #return NNAnd(sum_mask_pos, mask)
 
 class  SudokuIsEqual(nn.Module):
-    ''' Сравнивает, что две маски одинаковые. Т.е. решение не продвинулось дальше'''
+    ''' Сравнивает, что две маски одинаковые.
+        Т.е. решение не продвинулось дальше
+        Возвращает 0 если маски одинаковые.
+        '''
     def __init__(self, dtype, device):
         super(SudokuIsEqual,self).__init__()
         self.sum_all = nn.Conv2d(in_channels=9, out_channels=1, kernel_size=9)

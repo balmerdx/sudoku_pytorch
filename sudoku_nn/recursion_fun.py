@@ -201,7 +201,9 @@ class SudokuRecursionControl(nn.Module):
         super(SudokuRecursionControl,self).__init__()
         dtype = torch.float32
         self.sudoku_solved = SudokuSolved(dtype=dtype, device=device).to(device)
-        self.is_equal = SudokuIsEqual(dtype=dtype, device=device).to(device)
+        self.not_equal = SudokuIsEqual(dtype=dtype, device=device).to(device)
+
+        #!!!!!!!!!!!!SudokuIterate пока неверно работает, она убирает одну из возможностей, а должна оставлять одну из возможностей
         self.sudoku_iterate = SudokuIterate(device=device, kernel_size=kernel_size)
         self.sudoku_iterate_append = SudokuIterateAppend(device=device, kernel_size=kernel_size)
         self.sudoku_iterate_revert = SudokuIterateRevert(device=device, kernel_size=kernel_size)
@@ -213,12 +215,10 @@ class SudokuRecursionControl(nn.Module):
                 recursion_mask : torch.Tensor,
                 recursion_index : torch.Tensor) -> torch.Tensor:
         
-        #equal_mask = self.is_equal(sudoku_old, sudoku_new)
-        #пока для теста всегда применяем рекурсию, если решение валидно
+        not_equal_mask = self.not_equal(sudoku_old, sudoku_new)
         is_resolved, invalid_sudoku = self.sudoku_solved(sudoku_new)
-        print(f"SudokuRecursionControl is_resolved={is_resolved.item()} invalid_sudoku={invalid_sudoku.item()}")
-        if is_resolved.item() > 0:
-            pass
+        skip_recursion = NNOr(is_resolved, not_equal_mask)
+        print(f"SudokuRecursionControl is_resolved={is_resolved.item()} invalid_sudoku={invalid_sudoku.item()} skip_recursion={skip_recursion.item()}")
 
         append_recursion_mask = self.sudoku_iterate_append(sudoku_old, sudoku_new, recursion_mask, recursion_index)
         it_sudoku, it_recursion_mask, it_recursion_index  = self.sudoku_iterate(sudoku_new, append_recursion_mask, torch.add(recursion_index,1))
@@ -229,7 +229,7 @@ class SudokuRecursionControl(nn.Module):
                 reverted1_sudoku, reverted1_recursion_mask, reverted1_recursion_index)
         
         is_recursion1 = NNCompare(recursion_index, 1)
-        reverted_recursion_mask = NNSelect(reverted2_recursion_mask, reverted1_recursion_mask, is_recursion1)
+        reverted_recursion_mask = reverted2_recursion_mask
         reverted_sudoku = NNSelect(reverted2_sudoku, reverted1_sudoku, is_recursion1)
 
         #если судоку невалидное, то надо таки стирать эту цифру из вариантов
@@ -238,8 +238,8 @@ class SudokuRecursionControl(nn.Module):
         ret_recursion_mask = NNSelect(it_recursion_mask, reverted_recursion_mask, invalid_sudoku)
         ret_recursion_index = NNSelect(it_recursion_index, reverted2_recursion_index, invalid_sudoku)
 
-        #в случае уже решённого судоку ничего не делаем
-        ret_sudoku = NNSelect(ret_sudoku, sudoku_new, is_resolved)
-        ret_recursion_mask = NNSelect(ret_recursion_mask, recursion_mask, is_resolved)
-        ret_recursion_index = NNSelect(ret_recursion_index, recursion_index, is_resolved)
+        #в случае уже решённого судоку ничего не делаем, только добавляем потёртые ячейки
+        ret_sudoku = NNSelect(ret_sudoku, sudoku_new, skip_recursion)
+        ret_recursion_mask = NNSelect(ret_recursion_mask, append_recursion_mask, skip_recursion)
+        ret_recursion_index = NNSelect(ret_recursion_index, recursion_index, skip_recursion)
         return ret_sudoku, ret_recursion_mask, ret_recursion_index
