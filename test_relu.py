@@ -113,9 +113,41 @@ out2 = max_unpool(out, out_indices)
 
 print(out2.cpu().numpy())
 '''
-
+'''
 #sudoku = torch.round(torch.rand(1, 3, 3, 3))
 sudoku = torch.ones(1, 3, 3, 3)
+remove_other_elems = torch.zeros(1)
+iterate = SudokuIterate(device=sudoku.device, kernel_size=sudoku.shape[1])
+iterate_rev = SudokuIterateRevert(device=sudoku.device, kernel_size=sudoku.shape[1])
+print(sudoku)
+
+sudokus = []
+
+recursion_mask, recursion_index = None, None
+iterations = 5
+for _ in range(4):
+    for i in range(iterations):
+        sudokus.append(sudoku)
+        sudoku, recursion_mask, recursion_index = iterate(sudoku, recursion_mask, recursion_index)
+        #print(sudoku)
+        print(recursion_mask)
+        pass
+
+    #print(recursion_mask)
+
+    for i in range(iterations):
+        sudoku, recursion_mask, recursion_index = iterate_rev(sudoku, recursion_mask, recursion_index, remove_other_elems)
+        comared = torch.max(torch.abs(torch.sub(sudokus[iterations-1-i], sudoku))).item()
+        print(f"{comared=}")
+        print(recursion_mask)
+        #print(sudokus[iterations-1-i])
+        #print(sudoku)
+        pass
+'''
+
+
+#sudoku = torch.round(torch.rand(1, 3, 3, 3))
+sudoku = torch.ones(1, 4, 4, 4)
 iterate = SudokuIterate(device=sudoku.device, kernel_size=sudoku.shape[1])
 iterate_rev = SudokuIterateRevert(device=sudoku.device, kernel_size=sudoku.shape[1])
 iterate_append = SudokuIterateAppend(device=sudoku.device, kernel_size=sudoku.shape[1])
@@ -123,8 +155,8 @@ print(sudoku)
 
 sudokus = []
 
-recursion_mask, recursion_index = None, None
-iterations = 5
+recursion_mask, recursion_index = iterate.create_masks(sudoku)
+iterations = 7
 for i in range(iterations):
     sudokus.append(sudoku)
     sudoku, recursion_mask, recursion_index = iterate(sudoku, recursion_mask, recursion_index)
@@ -133,18 +165,23 @@ for i in range(iterations):
     sudoku_cleared_bits = NNAnd(sudoku_cleared_bits, sudoku)
     #print(sudoku_cleared_bits)
     sudoku_new = NNAnd(sudoku, NNNot(sudoku_cleared_bits))
-    recursion_mask = iterate_append(sudoku, sudoku_new, recursion_mask, torch.sub(recursion_index,1))
-    #print(recursion_mask)
+    recursion_mask = iterate_append(sudoku, sudoku_new, recursion_mask, recursion_index)
+    recursion_index = torch.add(recursion_index, 1)
+    print(recursion_mask)
     sudoku = sudoku_new
-    print(sudoku)
+    #print(sudoku)
     pass
 
 #print(recursion_mask)
-for i in range(iterations):
-    sudoku, recursion_mask, recursion_index = iterate_rev(sudoku, recursion_mask, recursion_index)
+for i in range(iterations-1, -1, -1):
+    is_recursion1 = torch.tensor([1 if i==0 else 0])
+    sudoku, recursion_mask, recursion_index = iterate_rev(sudoku, recursion_mask, recursion_index, None)
     comared = torch.max(torch.abs(torch.sub(sudokus[iterations-1-i], sudoku))).item()
-    print(f"{comared=}")
-    #print(recursion_mask)
+    #print(f"{comared=}")
+    print(recursion_mask)
     #print(sudokus[iterations-1-i])
-    print(sudoku)
+    #print(sudoku)
+    sudoku, recursion_mask, recursion_index = iterate_rev(sudoku, recursion_mask, recursion_index, is_recursion1)
+    comared = torch.max(torch.abs(torch.sub(sudokus[iterations-1-i], sudoku))).item()
+    print(recursion_mask)
     pass

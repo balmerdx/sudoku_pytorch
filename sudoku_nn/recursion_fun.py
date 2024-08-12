@@ -143,11 +143,21 @@ class SudokuIterate(nn.Module):
         
         #для выбранной ячейки надо как-то выбрать одну и только одну единичку
         one_variant = self.select_one_variant(sudoku, current_cell_mask)
-
-        add_recursion_mask = torch.mul(recursion_index.expand_as(one_variant), one_variant)
-        recursion_mask = torch.add(recursion_mask, add_recursion_mask)
-
-        sudoku = NNAnd(sudoku, NNNot(one_variant))
+        
+        if True:
+            #стираем всё кроме этой единички
+            cell_mask = torch.clamp(self.select_number_conv(one_variant), 0, 1)
+            one_recursion_mask = NNAnd(sudoku, cell_mask.expand_as(sudoku))
+            one_recursion_mask = NNAnd(one_recursion_mask, NNNot(one_variant))
+            add_recursion_mask = torch.mul(recursion_index.expand_as(one_recursion_mask), one_recursion_mask)
+            recursion_mask = torch.add(recursion_mask, add_recursion_mask)
+            sudoku = NNAnd(sudoku, NNNot(one_recursion_mask))
+            pass
+        else:
+            #стираем эту единичку
+            add_recursion_mask = torch.mul(recursion_index.expand_as(one_variant), one_variant)
+            recursion_mask = torch.add(recursion_mask, add_recursion_mask)
+            sudoku = NNAnd(sudoku, NNNot(one_variant))
 
         return sudoku, recursion_mask, torch.add(recursion_index, 1)
     
@@ -176,15 +186,27 @@ class SudokuIterateRevert(nn.Module):
     Он должен быть только один для sudoku.
     Выставляем в sudoku этот элемент как 1
     Убираем эти элементы из recursion_mask
+    remove_other_elems=1 - мы удаляем элементы которые находились в ячейках 
+    recursion_mask где есть хотябы одно число совпадающее с recursion_index
     '''
-    def __init__(self, device, kernel_size=9):
+    def __init__(self, device, kernel_size=9, remove_other_elems=False):
         super(SudokuIterateRevert,self).__init__()
+        self.select_number_conv = nn.Conv2d(in_channels=kernel_size, out_channels=1, kernel_size=1)
+        self.select_number_conv.weight = torch.nn.Parameter(torch.ones((1,kernel_size,1,1), device=device))
+        self.select_number_conv.bias = torch.nn.Parameter(torch.zeros(1, device=device))
 
     def forward(self, sudoku : torch.Tensor, 
-                recursion_mask : torch.Tensor | None,
-                recursion_index : torch.Tensor | None) -> torch.Tensor:
+                recursion_mask : torch.Tensor,
+                recursion_index : torch.Tensor,
+                remove_other_elems : torch.Tensor | None) -> torch.Tensor:
         recursion_index_sub = torch.sub(recursion_index, 1)
         equal_elem = NNCompare(recursion_mask, recursion_index_sub.expand_as(recursion_mask))
+
+        if not (remove_other_elems is None):
+            clear_mask = torch.clamp(self.select_number_conv(equal_elem), 0, 1)
+            clear_mask = NNAnd(clear_mask, remove_other_elems.expand_as(clear_mask))
+            sudoku = NNAnd(sudoku, NNNot(clear_mask).expand_as(sudoku))
+
         sudoku_add = torch.fmax(sudoku, equal_elem)
         recursion_mask_sub = torch.mul(recursion_mask, NNNot(equal_elem))
         return sudoku_add, recursion_mask_sub, recursion_index_sub
@@ -204,6 +226,7 @@ class SudokuRecursionControl(nn.Module):
         self.not_equal = SudokuIsEqual(dtype=dtype, device=device).to(device)
 
         #!!!!!!!!!!!!SudokuIterate пока неверно работает, она убирает одну из возможностей, а должна оставлять одну из возможностей
+        #делать revert для такого случая надо по особенному, убирать текущую цифру и добавлять все остальные в этой ячейке
         self.sudoku_iterate = SudokuIterate(device=device, kernel_size=kernel_size)
         self.sudoku_iterate_append = SudokuIterateAppend(device=device, kernel_size=kernel_size)
         self.sudoku_iterate_revert = SudokuIterateRevert(device=device, kernel_size=kernel_size)
@@ -219,23 +242,29 @@ class SudokuRecursionControl(nn.Module):
         is_resolved, invalid_sudoku = self.sudoku_solved(sudoku_new)
         skip_recursion = NNOr(is_resolved, not_equal_mask)
         print(f"SudokuRecursionControl is_resolved={is_resolved.item()} invalid_sudoku={invalid_sudoku.item()} skip_recursion={skip_recursion.item()}")
+        if invalid_sudoku.item() > 0.5:
+            pass
+        if skip_recursion.item() < 0.5:
+            pass
 
-        append_recursion_mask = self.sudoku_iterate_append(sudoku_old, sudoku_new, recursion_mask, recursion_index)
-        it_sudoku, it_recursion_mask, it_recursion_index  = self.sudoku_iterate(sudoku_new, append_recursion_mask, torch.add(recursion_index,1))
+        skip_recursion = NNAnd(skip_recursion, NNNot(invalid_sudoku))
+
+        append_recursion_mask = self.sudoku_iterate_append(sudoku_old, sudoku_new, recursion_mask, torch.sub(recursion_index, 1))
+        it_sudoku, it_recursion_mask, it_recursion_index  = self.sudoku_iterate(sudoku_new, append_recursion_mask, recursion_index)
+        it_recursion_index = torch.add(it_recursion_index,1) #оставляем пустой слот для sudoku_iterate_append
+
+        is_recursion1 = NNCompare(recursion_index, 3)
+        print(f"recursion_index={recursion_index.item()} is_recursion1={is_recursion1.item()}")
 
         reverted1_sudoku, reverted1_recursion_mask, reverted1_recursion_index = self.sudoku_iterate_revert(
-                sudoku_new, recursion_mask, recursion_index)
-        reverted2_sudoku, reverted2_recursion_mask, reverted2_recursion_index = self.sudoku_iterate_revert(
-                reverted1_sudoku, reverted1_recursion_mask, reverted1_recursion_index)
-        
-        is_recursion1 = NNCompare(recursion_index, 1)
-        reverted_recursion_mask = reverted2_recursion_mask
-        reverted_sudoku = NNSelect(reverted2_sudoku, reverted1_sudoku, is_recursion1)
-
+                sudoku_new, recursion_mask, recursion_index, None)
         #если судоку невалидное, то надо таки стирать эту цифру из вариантов
         #но только в случае если первая итерация
-        ret_sudoku = NNSelect(it_sudoku, reverted_sudoku, invalid_sudoku)
-        ret_recursion_mask = NNSelect(it_recursion_mask, reverted_recursion_mask, invalid_sudoku)
+        reverted2_sudoku, reverted2_recursion_mask, reverted2_recursion_index = self.sudoku_iterate_revert(
+                reverted1_sudoku, reverted1_recursion_mask, reverted1_recursion_index, is_recursion1)
+
+        ret_sudoku = NNSelect(it_sudoku, reverted2_sudoku, invalid_sudoku)
+        ret_recursion_mask = NNSelect(it_recursion_mask, reverted2_recursion_mask, invalid_sudoku)
         ret_recursion_index = NNSelect(it_recursion_index, reverted2_recursion_index, invalid_sudoku)
 
         #в случае уже решённого судоку ничего не делаем, только добавляем потёртые ячейки

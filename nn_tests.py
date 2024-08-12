@@ -118,9 +118,8 @@ for idx in range(1000):
     draw(f"{idx} before recursion", test_hints)
     new_mask, recursion_mask, recursion_index = sudoku_recursion(mask_old, mask, recursion_mask, recursion_index)
     is_equal = sudoku_equal(new_mask, mask)
+    mask = new_mask
     if is_equal.item() > 0:
         draw(f"{idx} sudoku_recursion", test_hints)
-    mask = new_mask
-
     pass
     
