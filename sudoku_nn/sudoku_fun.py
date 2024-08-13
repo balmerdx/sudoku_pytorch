@@ -364,7 +364,10 @@ class SudokuDigitsDoubles(nn.Module):
         return NNAnd(mask, NNNot(erase_mask))
 
 class SudokuSolved(nn.Module):
-    ''' Класс, который проверяет, что sudoku решилось, либо нет возможности решить.'''
+    ''' Класс, который проверяет, что sudoku решилось, либо нет возможности решить.
+        Надо добавить проверку, что каждое число исключительно в единственном экземпляре в строчке/столбце/box.
+        Потому как судоку может быть неверно решено.
+    '''
     def __init__(self, dtype, device):
         super(SudokuSolved,self).__init__()
         self.ones_in_cell = SudokuNumbersInCell(number_to_compare=1, dtype=dtype, device=device)
@@ -376,20 +379,44 @@ class SudokuSolved(nn.Module):
 
         self.max_9x9 = nn.MaxPool2d(kernel_size=9)
 
+        self.down_h = SudokuSumDownsample("h", dtype=dtype, device=device)
+        self.down_v = SudokuSumDownsample("v", dtype=dtype, device=device)
+        self.down_box = SudokuSumDownsample("box", dtype=dtype, device=device)
+
     def forward(self, mask : torch.Tensor) -> torch.Tensor:
+        sudoku_area = mask.shape[2]*mask.shape[3]
         determine_mask = self.ones_in_cell(mask)
         #количество однозначных ячеек
         determine_sum = self.sum_9x9(determine_mask)
         #если все 81 ячейка разрешены, значит судоку решилось
-        is_resolved = NNCompare(determine_sum, 81)
+        all_cells_resolved = NNCompare(determine_sum, sudoku_area).squeeze()
 
         zeros_mask = self.zeros_in_cell(mask)
         #если хоть в одной из ячеек ничего нельзя разместить,
         #то судоку не решилось
         zeros_max = self.max_9x9(zeros_mask)
 
+        is_invalid = zeros_max.squeeze()
+
+        mask_ones_in_cell = NNAnd(mask, determine_mask.expand_as(mask))
+
+        #в каждом из h/v/box должно быть не более одного определённого числа.
+        mask_h = self.down_h.downsample(mask_ones_in_cell)
+        mask_h = torch.max(nn.functional.relu(torch.sub(mask_h,1)))
+
+        mask_v = self.down_v.downsample(mask_ones_in_cell)
+        mask_v = torch.max(nn.functional.relu(torch.sub(mask_v,1)))
+
+        mask_box = self.down_box.downsample(mask_ones_in_cell)
+        mask_box = torch.max(nn.functional.relu(torch.sub(mask_box,1)))
+
+        is_resolved_invalid = NNOr(NNOr(mask_h, mask_v), mask_box)
+
+        is_invalid = NNOr(is_invalid, is_resolved_invalid)
+        is_resolved = NNAnd(all_cells_resolved, NNNot(is_resolved_invalid))
+
         #первое число - решено ли sudoku, второе число - решаемо ли судоку
-        return is_resolved.squeeze(), zeros_max.squeeze()
+        return is_resolved, is_invalid
 
 '''
 Этого должно хватить для решения простых hardest судоку.
