@@ -117,7 +117,7 @@ class DrawSudoku:
                     pass
         pass
 
-    def _draw_sudoku(self, sudoku, hints, use_prev_hints, prev_hints, prev_color, img=None):
+    def _draw_sudoku(self, sudoku, hints, use_prev_hints, prev_hints, prev_color, next_color, img=None):
         def is_hints(cell_hints):
             is_resolved_ = False
             is_partial_ = False
@@ -159,7 +159,9 @@ class DrawSudoku:
 
             cell_hints = None
             prev_cell_hints = None
-            if not s.isdigit() and not(hints is None):
+            #if not s.isdigit() and not(hints is None):
+            is_initial_resolved = s.isdigit()
+            if not(hints is None):
                 cell_hints = hints[y,x,:]
                 is_resolved, is_partial, is_invalid = is_hints(cell_hints)
                 if use_prev_hints:
@@ -167,14 +169,20 @@ class DrawSudoku:
                     is_resolved_p, is_partial_p, is_invalid_p = is_hints(prev_cell_hints)
                     if is_resolved and is_resolved_p:
                         s = is_resolved
+                    else:
+                        s = '.'
                     is_partial = is_partial or is_partial_p
                 else:
                     if is_resolved:
                         s = is_resolved
+                    else:
+                        s = '.'
+
+            if is_initial_resolved:
+                is_resolved = None
+                d.rectangle(self.cell_rect(x,y), fill=(220, 220, 220))
 
             if s.isdigit():
-                if not is_resolved:
-                    d.rectangle(self.cell_rect(x,y), fill=(220, 220, 220))
                 _,_, tw, th = d.textbbox((0,0), s, font=self.big_font)
                 d.text((cx+(self.cell_size-tw)//2, cy+(self.cell_size-th)//2+offsety_big), s, fill=(0,0,0), font=self.big_font)
 
@@ -192,6 +200,8 @@ class DrawSudoku:
                     else:
                         if not cell_hints[j] and prev_cell_hints[j]:
                             color = prev_color
+                        if cell_hints[j] and not prev_cell_hints[j]:
+                            color = next_color
                         if not cell_hints[j] and not prev_cell_hints[j]:
                             continue
                     sm_cx = cx + sc*(j%3)
@@ -236,6 +246,7 @@ class DrawSudoku:
         if use_prev_hints and (self.prev_hints is None):
             use_prev_hints = False
         prev_color = (0,prev_intensity,0)
+        next_color = (prev_intensity,0,0)
 
         def get_prev_hints(idx):
             if self.prev_hints is None:
@@ -247,15 +258,15 @@ class DrawSudoku:
         if two_hints:
             img0 = self.img_planes[0]
             img1 = self.img_planes[1]
-            self._draw_sudoku(sudoku, hints[0,:,:,:], use_prev_hints, prev_hints=get_prev_hints(0), prev_color=prev_color, img=img0)
-            self._draw_sudoku(sudoku, hints[1,:,:,:], use_prev_hints, prev_hints=get_prev_hints(0), prev_color=prev_color, img=img1)
+            self._draw_sudoku(sudoku, hints[0,:,:,:], use_prev_hints, prev_hints=get_prev_hints(0), prev_color=prev_color, next_color=next_color, img=img0)
+            self._draw_sudoku(sudoku, hints[1,:,:,:], use_prev_hints, prev_hints=get_prev_hints(0), prev_color=prev_color, next_color=next_color, img=img1)
 
             chR = img0.getchannel('G')
             chG = img1.getchannel('G')
             chB = Image.blend(img0.getchannel('B'), img1.getchannel('B'), 0.5)
             self.img = Image.merge("RGB", (chR, chG, chB))
         else:
-            self._draw_sudoku(sudoku, hints, use_prev_hints, prev_hints=get_prev_hints(0), prev_color=prev_color)
+            self._draw_sudoku(sudoku, hints, use_prev_hints, prev_hints=get_prev_hints(0), prev_color=prev_color, next_color=next_color)
 
         self._draw_back_mask(back_mask, back_mask_color)
         if not (self.store_all_images is None):
