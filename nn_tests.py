@@ -88,7 +88,7 @@ sudoku_solved = SudokuSolved(dtype=dtype, device=device).to(device)
 sudoku_recursion = SudokuRecursionControl(device=device).to(device)
 
 recursion_mask, recursion_index = sudoku_recursion.create_masks(mask)
-#restore_sudoku_arrays()
+restore_sudoku_arrays()
 draw()
 
 for idx in range(1000):

@@ -257,11 +257,12 @@ class SudokuRecursionControl(nn.Module):
         print(f"recursion_index={recursion_index.item()} is_recursion1={is_recursion1.item()}")
 
         reverted1_sudoku, reverted1_recursion_mask, reverted1_recursion_index = self.sudoku_iterate_revert(
-                sudoku_new, recursion_mask, recursion_index, None)
+                sudoku_new, append_recursion_mask, recursion_index, None)
         #если судоку невалидное, то надо таки стирать эту цифру из вариантов
         #но только в случае если первая итерация
         reverted2_sudoku, reverted2_recursion_mask, reverted2_recursion_index = self.sudoku_iterate_revert(
                 reverted1_sudoku, reverted1_recursion_mask, reverted1_recursion_index, is_recursion1)
+        #reverted2_sudoku, reverted2_recursion_mask, reverted2_recursion_index = reverted1_sudoku, reverted1_recursion_mask, torch.sub(reverted1_recursion_index, 1)
 
         ret_sudoku = NNSelect(it_sudoku, reverted2_sudoku, invalid_sudoku)
         ret_recursion_mask = NNSelect(it_recursion_mask, reverted2_recursion_mask, invalid_sudoku)
