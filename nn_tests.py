@@ -8,6 +8,22 @@ dtype=torch.float32
 device = torch.device("cuda", 0)
 #dtype=torch.int8
 
+def store_sudoku_arrays():
+    from os.path import join
+    dir = "store_sudoku_arrays"
+    torch.save(mask, join(dir, "mask"))
+    torch.save(recursion_mask, join(dir, "recursion_mask"))
+    torch.save(recursion_index, join(dir, "recursion_index"))
+    pass
+
+def restore_sudoku_arrays():
+    from os.path import join
+    global mask, recursion_mask, recursion_index
+    dir = "store_sudoku_arrays"
+    mask = torch.load(join(dir, "mask"), weights_only=True)
+    recursion_mask = torch.load(join(dir, "recursion_mask"), weights_only=True)
+    recursion_index = torch.load(join(dir, "recursion_index"), weights_only=True)
+    pass
 
 def draw(name="Initial", back_mask=None):
     print(name)
@@ -17,7 +33,9 @@ def draw(name="Initial", back_mask=None):
         ds.draw_sudoku(sudoku=sudoku.decode(), hints=mask_to_np(mask), store_prev_hints=False, prev_intensity=192, back_mask=back_mask)
         ds.show(time_msec=300)
     ds.draw_sudoku(sudoku=sudoku.decode(), hints=mask_to_np(mask), store_prev_hints=True, use_prev_hints=False, back_mask=back_mask)
-    ds.show()
+    key = ds.show()
+    if key==ord('1'):
+        store_sudoku_arrays()
 
 #sudoku = b'9...84.6.6.4..52.7.3..7..8.76...15...53.....1...4.96.31.5.26.9...2.4....8....371.' #easy
 #sudoku = b".68..5.9.7...12..6...86...287....3...92...51...3....671...83...6..59...3.5.7..18." #medium
@@ -70,7 +88,7 @@ sudoku_solved = SudokuSolved(dtype=dtype, device=device).to(device)
 sudoku_recursion = SudokuRecursionControl(device=device).to(device)
 
 recursion_mask, recursion_index = sudoku_recursion.create_masks(mask)
-
+#restore_sudoku_arrays()
 draw()
 
 for idx in range(1000):
@@ -122,4 +140,4 @@ for idx in range(1000):
     if is_equal.item() > 0:
         draw(f"{idx} sudoku_recursion", test_hints)
     pass
-    
+   

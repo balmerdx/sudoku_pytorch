@@ -94,7 +94,7 @@ class DrawSudoku:
                 self.store_all_images[-1].save(f"img{len(self.store_all_images)}.png")
             if key==225 or key==233: #skip alt shift
                 continue
-            break
+            return key
 
     def _draw_back_mask(self, back_mask, color):
         if back_mask is None:
