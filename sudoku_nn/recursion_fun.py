@@ -203,9 +203,9 @@ class SudokuIterateRevert(nn.Module):
     Выставляем в sudoku этот элемент как 1
     Убираем эти элементы из recursion_mask
     remove_other_elems=1 - мы удаляем элементы которые находились в ячейках 
-    recursion_mask где есть хотябы одно число совпадающее с recursion_index
+    recursion_mask где есть хотя бы одно число совпадающее с recursion_index
     '''
-    def __init__(self, device, kernel_size=9, remove_other_elems=False):
+    def __init__(self, device, kernel_size=9):
         super(SudokuIterateRevert,self).__init__()
         self.select_number_conv = nn.Conv2d(in_channels=kernel_size, out_channels=1, kernel_size=1)
         self.select_number_conv.weight = torch.nn.Parameter(torch.ones((1,kernel_size,1,1), device=device))
@@ -283,7 +283,6 @@ class SudokuRecursionControl(nn.Module):
         #т.е. записывать эту цифру для индекса в котором remove_other_elems=None
         reverted2_sudoku, reverted2_recursion_mask, reverted2_recursion_index = self.sudoku_iterate_revert(
                 reverted1_sudoku, reverted1_recursion_mask, reverted1_recursion_index, self.one)
-        #reverted2_sudoku, reverted2_recursion_mask, reverted2_recursion_index = reverted1_sudoku, reverted1_recursion_mask, torch.sub(reverted1_recursion_index, 1)
 
         ret_sudoku = NNSelect(it_sudoku, reverted2_sudoku, invalid_sudoku)
         ret_recursion_mask = NNSelect(it_recursion_mask, reverted2_recursion_mask, invalid_sudoku)

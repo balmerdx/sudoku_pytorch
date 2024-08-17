@@ -7,6 +7,7 @@ from sudoku_nn import *
 dtype=torch.float32
 device = torch.device("cuda", 0)
 #dtype=torch.int8
+draw_witout_press_key = False
 
 def store_sudoku_arrays():
     from os.path import join
@@ -27,13 +28,15 @@ def restore_sudoku_arrays():
 
 def draw(name="Initial", back_mask=None):
     print(name)
+    
     if mask.shape[0]==1 and not(ds.prev_hints is None):
+        time_msec = 1 if draw_witout_press_key else 200
         ds.draw_sudoku(sudoku=sudoku.decode(), hints=mask_to_np(mask), store_prev_hints=False, prev_intensity=128, back_mask=back_mask)
-        ds.show(time_msec=300)
+        ds.show(time_msec=time_msec)
         ds.draw_sudoku(sudoku=sudoku.decode(), hints=mask_to_np(mask), store_prev_hints=False, prev_intensity=192, back_mask=back_mask)
-        ds.show(time_msec=300)
+        ds.show(time_msec=time_msec)
     ds.draw_sudoku(sudoku=sudoku.decode(), hints=mask_to_np(mask), store_prev_hints=True, use_prev_hints=False, back_mask=back_mask)
-    key = ds.show()
+    key = ds.show(time_msec = 1 if draw_witout_press_key else 0)
     if key==ord('1'):
         store_sudoku_arrays()
 
@@ -44,6 +47,7 @@ def draw(name="Initial", back_mask=None):
 #sudoku = b".....8.568...92...1.....28.7.6....1..8.9.6.4..1....9.2.48.....7...24...595.6....." #hard
 #sudoku = b".......8...21.....947.3...57.62..1......5....3.17..8..183.6...4..49............6." #hard двойка одинаковых чисел
 #sudoku = b"5..6....3.....3.2.9..2.7.8...8....32..43..9.5..9....688..7.2.5......4.7.7..9....6" #veryhard
+#sudoku = b"7..5...8....2..7948...47..5531......2.......9......4133..48...7456..2....7...3..6" #veryhard
 #sudoku = b"8.........95.......76.........426798...571243...893165......916....3.487....1.532" #puzzles7_serg_benchmark extra hard
 #sudoku = b".................1.....2.3......3.2...1.4......5....6..3......4.7..8...962...7..." #data/puzzles2_17_clue 0
 #sudoku = b'.................1.....2.34.....4.....5...6....6.3.....3..6.....7..5.8..24......7' #data/puzzles2_17_clue 19 требуется двойка одинаковых чисел
@@ -55,9 +59,9 @@ def draw(name="Initial", back_mask=None):
 #sudoku = get_puzzle("data/puzzles0_kaggle")
 #sudoku = get_puzzle("data/puzzles2_17_clue", 9)
 #sudoku = get_puzzle("data/puzzles1_unbiased", 2) #можно как hardest использовать не особо сложные
-sudoku = get_puzzle("data/puzzles5_forum_hardest_1905_11+", 3) #3 решалось огроменное количество шагов, пришлось улучшить SudokuSolved распознавание invalid
-#sudoku = get_puzzle("data/puzzles7_serg_benchmark", 8302)
-#sudoku = get_puzzle("data/puzzles3_magictour_top1465", 0)
+#sudoku = get_puzzle("data/puzzles5_forum_hardest_1905_11+", 8) #3 решалось огроменное количество шагов, пришлось улучшить SudokuSolved распознавание invalid
+#sudoku = get_puzzle("data/puzzles7_serg_benchmark", 5)
+sudoku = get_puzzle("data/puzzles3_magictour_top1465", 33) #easy 4 30
 
 #sudoku  = b'9...84.6.6.4..52.7.3..7..8.76...15...53.....1...4.96.31.5.26.9...2.4....8....371.'
 #sudoku2 = b".68..5.9.7...12..6...86...287....3...92...51...3....671...83...6..59...3.5.7..18."
@@ -141,5 +145,12 @@ for idx in range(1000):
     mask = new_mask
     if is_equal.item() > 0:
         draw(f"{idx} sudoku_recursion", test_hints)
+
+    is_resolved, is_invalid = sudoku_solved(mask)
+    if is_resolved.item()>0 and draw_witout_press_key:
+        break
     pass
    
+if draw_witout_press_key:
+    print("Save gif")
+    ds.save_gif()
