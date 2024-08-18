@@ -325,9 +325,9 @@ class SudokuDigitsDoubles(nn.Module):
         encode_permutations = torch.tensor(encode_permutations_np, dtype=dtype, device=device).unsqueeze(2).unsqueeze(3)
         decode_permutations = torch.tensor(decode_permutations_np, dtype=dtype, device=device).unsqueeze(2).unsqueeze(3)
 
-        self.sum_permutations = nn.Conv2d(in_channels=9, out_channels=36, kernel_size=1)
-        self.sum_permutations.weight = torch.nn.Parameter(encode_permutations)
-        self.sum_permutations.bias = torch.nn.Parameter(torch.zeros(36, dtype=dtype, device=device))
+        self.encode_permutations = nn.Conv2d(in_channels=9, out_channels=36, kernel_size=1)
+        self.encode_permutations.weight = torch.nn.Parameter(encode_permutations)
+        self.encode_permutations.bias = torch.nn.Parameter(torch.zeros(36, dtype=dtype, device=device))
 
         self.decode_permutations = nn.Conv2d(in_channels=36, out_channels=9, kernel_size=1)
         self.decode_permutations.weight = torch.nn.Parameter(decode_permutations)
@@ -340,7 +340,7 @@ class SudokuDigitsDoubles(nn.Module):
 
     def forward(self, mask : torch.Tensor, return_erase=False) -> torch.Tensor:
         #сумма по 2 элемента в этой ячейке во всех комбинациях
-        permutations = self.sum_permutations(mask)
+        permutations = self.encode_permutations(mask)
         permutations = NNCompare(permutations, 2)
 
         sum_permutations = self.sum_all_permutations(permutations)
