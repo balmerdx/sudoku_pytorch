@@ -55,7 +55,7 @@ def solve_interactive(sudoku, draw_witout_press_key=False, draw_all_changes=Fals
     doubles_box = SudokuDigitsDoubles("box", dtype=dtype, device=device).to(device)
 
     sudoku_solved = SudokuSolved(dtype=dtype, device=device).to(device)
-    sudoku_recursion = SudokuRecursionControl(device=device).to(device)
+    sudoku_recursion = SudokuRecursionControl(device=device, enable_print=True).to(device)
 
     recursion_mask, recursion_index = sudoku_recursion.create_masks(mask)
     #restore_sudoku_arrays()

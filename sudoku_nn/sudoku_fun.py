@@ -247,7 +247,8 @@ class  SudokuIsEqual(nn.Module):
         self.sum_all.bias = torch.nn.Parameter(torch.zeros(1, dtype=dtype, device=device))
 
     def forward(self, mask1 : torch.Tensor, mask2 : torch.Tensor) -> torch.Tensor:
-        return self.sum_all(torch.abs(torch.sub(mask1, mask2)))
+        is_eq = torch.abs(torch.sub(mask1, mask2))
+        return self.sum_all(is_eq)
 
 class SudokuDigitsInOneLineAtBox(nn.Module):
     '''
@@ -396,19 +397,19 @@ class SudokuSolved(nn.Module):
         #то судоку не решилось
         zeros_max = self.max_9x9(zeros_mask)
 
-        is_invalid = zeros_max.squeeze()
+        is_invalid = zeros_max.reshape((zeros_max.shape[0],))
 
         mask_ones_in_cell = NNAnd(mask, determine_mask.expand_as(mask))
 
         #в каждом из h/v/box должно быть не более одного определённого числа.
         mask_h = self.down_h.downsample(mask_ones_in_cell)
-        mask_h = torch.max(nn.functional.relu(torch.sub(mask_h,1)))
+        mask_h = torch.amax(nn.functional.relu(torch.sub(mask_h,1)), dim=(1,2,3))
 
         mask_v = self.down_v.downsample(mask_ones_in_cell)
-        mask_v = torch.max(nn.functional.relu(torch.sub(mask_v,1)))
+        mask_v = torch.amax(nn.functional.relu(torch.sub(mask_v,1)), dim=(1,2,3))
 
         mask_box = self.down_box.downsample(mask_ones_in_cell)
-        mask_box = torch.max(nn.functional.relu(torch.sub(mask_box,1)))
+        mask_box = torch.amax(nn.functional.relu(torch.sub(mask_box,1)), dim=(1,2,3))
 
         is_resolved_invalid = NNOr(NNOr(mask_h, mask_v), mask_box)
 
@@ -445,42 +446,3 @@ def sudoku_to_mask(sudoku, dtype):
         return conv_sudoku(input)
     else:
         assert 0
-
-class SudokuPasses(nn.Module):
-    '''
-    Класс, который может решать судоку за 1 проход.
-    Если конечно повезёт и судоку не очень сложное.
-    '''
-    def __init__(self, dtype, device, passes=4, remove_doubles=True):
-        super(SudokuPasses,self).__init__()
-        self.passes = passes
-        self.remove_doubles = remove_doubles
-        self.remove_box = SudokuFilterHVBox("box", dtype=dtype, device=device).to(device)
-        self.uniq_h = SudokuUniqueHVBox("h", dtype=dtype, device=device).to(device)
-        self.uniq_v = SudokuUniqueHVBox("v", dtype=dtype, device=device).to(device)
-        self.uniq_box = SudokuUniqueHVBox("box", dtype=dtype, device=device).to(device)
-        self.sudoku_equal = SudokuIsEqual(dtype=dtype, device=device).to(device)
-        self.digits_in_one_line_at_box_h = SudokuDigitsInOneLineAtBox("h", dtype=dtype, device=device).to(device)
-        self.digits_in_one_line_at_box_v = SudokuDigitsInOneLineAtBox("v", dtype=dtype, device=device).to(device)
-
-        self.doubles_h = SudokuDigitsDoubles("v", dtype=dtype, device=device).to(device)
-        self.doubles_v = SudokuDigitsDoubles("v", dtype=dtype, device=device).to(device)
-        self.doubles_box = SudokuDigitsDoubles("box", dtype=dtype, device=device).to(device)
-
-        self.sudoku_solved = SudokuSolved(dtype=dtype, device=device).to(device)
-
-    def forward(self, mask : torch.Tensor) -> torch.Tensor:
-        for _ in range(self.passes):
-            mask = self.remove_box(mask)
-            mask = self.digits_in_one_line_at_box_h(mask)
-            mask = self.digits_in_one_line_at_box_v(mask)
-            mask = self.uniq_h(mask)
-            mask = self.uniq_v(mask)
-            mask = self.uniq_box(mask)
-
-            #не требуется для решения puzzles0_kaggle
-            if self.remove_doubles:
-                mask = self.doubles_h(mask)
-                mask = self.doubles_v(mask)
-                mask = self.doubles_box(mask)
-        return mask, self.sudoku_solved(mask)

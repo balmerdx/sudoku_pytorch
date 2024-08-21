@@ -1,4 +1,5 @@
 from sudoku_interactive import solve_interactive
+from sudoku_stuff import *
 
 #sudoku = b'9...84.6.6.4..52.7.3..7..8.76...15...53.....1...4.96.31.5.26.9...2.4....8....371.' #easy
 #sudoku = b".68..5.9.7...12..6...86...287....3...92...51...3....671...83...6..59...3.5.7..18." #medium
@@ -17,14 +18,14 @@ from sudoku_interactive import solve_interactive
 #sudoku = b"22.371259325849761971265843436192587198657432257483916689734125713528694542916378" #invalid
 
 #sudoku = get_puzzle("data/puzzles0_kaggle")
-#sudoku = get_puzzle("data/puzzles2_17_clue", 9)
+#sudoku = get_puzzle("data/puzzles2_17_clue", 0)
 #sudoku = get_puzzle("data/puzzles1_unbiased", 2) #можно как hardest использовать не особо сложные
 #sudoku = get_puzzle("data/puzzles5_forum_hardest_1905_11+", 8) #3 решалось огроменное количество шагов, пришлось улучшить SudokuSolved распознавание invalid
-#sudoku = get_puzzle("data/puzzles7_serg_benchmark", 5)
+sudoku = get_puzzle("data/puzzles7_serg_benchmark", 5)
 #sudoku = get_puzzle("data/puzzles3_magictour_top1465", 30) #easy 4 30
 
 #https://www.google.com/search?newwindow=1&client=ubuntu-sn&hs=rzG&sca_esv=e3ff2cacd83f1ace&channel=fs&sxsrf=ADLYWIK_uox5MzPdr9OSkR06N62CrL8Crg:1722364908241&q=Fastest+algorithm+to+solve+Sudoku&uds=ADvngMjvPWL3d2w2-NRjpDFznBOP8WBJNS0ErgI6af4zFntGhDeoodfxks_hG3knjbM5AAeRyq7yXMXaK2WdmMWDuQ-0Q4zNwaO43WVGyBAwF4OQv5JwtX-VFSpSPQS7kcVJAMYhYIK4zJGKcD0qtb59Eb4FufsgKg&sa=X&ved=2ahUKEwj1052ktc-HAxUWPxAIHZ6RGUMQxKsJegQIGhAB&ictx=0&biw=2490&bih=1328&dpr=1#fpstate=ive&vld=cid:592ceb4d,vid:gP5M1EoQe-4,st:0
-sudoku = b'.....6.7..5..8.6933.......2..9..1.4...25.38...7.6..2..6.......5543.6..8..9.1.....' #easy
+#sudoku = b'.....6.7..5..8.6933.......2..9..1.4...25.38...7.6..2..6.......5543.6..8..9.1.....' #easy
 #sudoku = b'95....67......731.8..561...23.........9...1.........37...145..9.942......85....21' #very hard
 #sudoku = b'004300209005009001070060043006002087190007400050083000600000105003508690042910300' #1 million
 #sudoku = get_puzzle_csv(max_count=1000)[13]
