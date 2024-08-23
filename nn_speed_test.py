@@ -14,9 +14,9 @@ def speed_test(filename="data/puzzles0_kaggle", batch_size=100000,
     sudoku = get_puzzle(filename, idx='all')
     load_time = time()-start_time
     print(len(sudoku), f"load time = {load_time} sec, puzzles count = {len(sudoku)} ")
-    if len(sudoku) > 2*batch_size:
-        #нам не требуется гиганское количество для тестов
-        sudoku = sudoku[0:2*batch_size]
+    #if len(sudoku) > 2*batch_size:
+    #    #нам не требуется гиганское количество для тестов
+    #    sudoku = sudoku[0:2*batch_size]
 
     start_time = time()
 
@@ -71,5 +71,6 @@ if __name__ == "__main__":
     #speed_test("data/puzzles0_kaggle", batch_size=100000, passes_count=4, remove_doubles=False)
     #speed_test("data/puzzles2_17_clue", batch_size=100000, passes_count=16, remove_doubles=True)
     #speed_test("data/puzzles2_17_clue", batch_size=100000, passes_count=32, remove_doubles=True)
-    speed_test("data/puzzles7_serg_benchmark", batch_size=17, passes_count=50, remove_doubles=True, use_recursion=True)
+    #speed_test("data/puzzles7_serg_benchmark", batch_size=10000, passes_count=50, remove_doubles=True, use_recursion=True)
+    speed_test("data/puzzles2_17_clue", batch_size=10000, passes_count=50, remove_doubles=True, use_recursion=True)
     pass

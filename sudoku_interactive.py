@@ -6,6 +6,18 @@ import argparse
 dtype = torch.float32
 device =  torch.device('cuda' if torch.cuda.is_available() else 'cpu', 0)
 
+back_mask_colors = [
+    ]
+#показывваем только точки рекурсии
+for i in range(255, 80, -70):
+    back_mask_colors.append((255,100,100,i))
+    back_mask_colors.append((100,255,100,0))
+
+for i in range(255, 80, -70):
+    back_mask_colors.append((255,255,100,i))
+    back_mask_colors.append((100,255,100,0))
+
+
 def store_sudoku_arrays():
     from os.path import join
     dir = "store_sudoku_arrays"
@@ -28,16 +40,18 @@ def draw(sudoku, mask, ds: DrawSudoku, name="Initial", back_mask=None, draw_wito
     
     if mask.shape[0]==1 and not(ds.prev_hints is None):
         time_msec = 1 if draw_witout_press_key else 200
-        ds.draw_sudoku(sudoku=sudoku.decode(), hints=mask_to_np(mask), store_prev_hints=False, prev_intensity=128, back_mask=back_mask)
+        ds.draw_sudoku(sudoku=sudoku.decode(), hints=mask_to_np(mask), store_prev_hints=False, prev_intensity=128, back_mask=back_mask, back_mask_colors=back_mask_colors)
         ds.show(time_msec=time_msec)
-        ds.draw_sudoku(sudoku=sudoku.decode(), hints=mask_to_np(mask), store_prev_hints=False, prev_intensity=192, back_mask=back_mask)
+        ds.draw_sudoku(sudoku=sudoku.decode(), hints=mask_to_np(mask), store_prev_hints=False, prev_intensity=192, back_mask=back_mask, back_mask_colors=back_mask_colors)
         ds.show(time_msec=time_msec)
-    ds.draw_sudoku(sudoku=sudoku.decode(), hints=mask_to_np(mask), store_prev_hints=True, use_prev_hints=False, back_mask=back_mask)
+    ds.draw_sudoku(sudoku=sudoku.decode(), hints=mask_to_np(mask), store_prev_hints=True, use_prev_hints=False, back_mask=back_mask, back_mask_colors=back_mask_colors)
     key = ds.show(time_msec = 1 if draw_witout_press_key else 0)
     if key==ord('1'):
         store_sudoku_arrays()
 
-def solve_interactive(sudoku, draw_witout_press_key=False, draw_all_changes=False):
+def solve_interactive(sudoku, draw_witout_press_key=False, draw_all_changes=False,
+                      enable_doubles=True,
+                      enable_recursion=True):
     ds = DrawSudoku(enable_store_images=True)
     mask = sudoku_to_mask(sudoku, dtype=dtype)
     mask = mask.to(device)
@@ -57,21 +71,26 @@ def solve_interactive(sudoku, draw_witout_press_key=False, draw_all_changes=Fals
     sudoku_solved = SudokuSolved(dtype=dtype, device=device).to(device)
     sudoku_recursion = SudokuRecursionControl(device=device, enable_print=True).to(device)
 
-    recursion_mask, recursion_index = sudoku_recursion.create_masks(mask)
+    if enable_recursion:
+        recursion_mask, recursion_index = sudoku_recursion.create_masks(mask)
+    else:
+        recursion_mask, recursion_index = None, None
     #restore_sudoku_arrays()
-    is_resolved, is_invalid = sudoku_solved(mask)
+    #is_resolved, is_invalid = sudoku_solved(mask)
     #print(f"is_resolved={is_resolved.item()} is_invalid={is_invalid.item()}")
 
     draw(sudoku, mask, ds, draw_witout_press_key=draw_witout_press_key)
 
     for idx in range(1000):
+        no_changes = True
         def one_pass(function, name):
-            nonlocal mask
+            nonlocal mask, no_changes
             new_mask = function(mask)
             is_equal = sudoku_equal(new_mask, mask)
             mask = new_mask
             if is_equal.item() > 0 and draw_all_changes:
-                draw(sudoku, mask, ds, f"{idx} {name}")
+                no_changes = False
+                draw(sudoku, mask, ds, f"{idx} {name}", draw_witout_press_key=draw_witout_press_key, back_mask=recursion_mask)
 
         mask_old = mask
 
@@ -92,16 +111,20 @@ def solve_interactive(sudoku, draw_witout_press_key=False, draw_all_changes=Fals
         if mask.shape[0]==1:
             print(hints_to_str(mask))
     
-        one_pass(doubles_h, 'doubles_h')
-        one_pass(doubles_v, 'doubles_v')
-        one_pass(doubles_box, 'doubles_box')
+        if enable_doubles:
+            one_pass(doubles_h, 'doubles_h')
+            one_pass(doubles_v, 'doubles_v')
+            one_pass(doubles_box, 'doubles_box')
 
-        draw(sudoku, mask, ds, f"{idx} before recursion", test_hints, draw_witout_press_key=draw_witout_press_key)
-        new_mask, recursion_mask, recursion_index = sudoku_recursion(mask_old, mask, recursion_mask, recursion_index)
-        is_equal = sudoku_equal(new_mask, mask)
-        mask = new_mask
-        if is_equal.item() > 0:
-            draw(sudoku, mask, ds, f"{idx} sudoku_recursion", test_hints, draw_witout_press_key=draw_witout_press_key)
+        if no_changes:
+            draw(sudoku, mask, ds, f"{idx} free draw", draw_witout_press_key=draw_witout_press_key, back_mask=recursion_mask)
+
+        if enable_recursion:
+            new_mask, recursion_mask, recursion_index = sudoku_recursion(mask_old, mask, recursion_mask, recursion_index)
+            is_equal = sudoku_equal(new_mask, mask)
+            mask = new_mask
+            if is_equal.item() > 0:
+                draw(sudoku, mask, ds, f"{idx} sudoku_recursion", draw_witout_press_key=draw_witout_press_key, back_mask=recursion_mask)
 
         is_resolved, is_invalid = sudoku_solved(mask)
         if is_resolved.item()>0 and draw_witout_press_key:

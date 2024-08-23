@@ -21,6 +21,18 @@ class DrawSudoku:
         self.cell_size = 3*24
         self.line_width = 1
         self.line_width2 = 2
+        self.offsety_big = -8
+        self.offsety_sm = -2
+
+        if True:
+            #draw small sudoku
+            half = 2
+            self.cell_size = 3*24 // half
+            self.line_width = 1
+            self.line_width2 = 2
+            self.offsety_big = -8 // half
+            self.offsety_sm = -2 // half
+
         self.image_size = 9*self.cell_size + 6*self.line_width + 4*self.line_width2
         self.big_font = ImageFont.truetype(fontname, size=self.cell_size)
         self.small_font = ImageFont.truetype(fontname, size=self.cell_size//3)
@@ -96,10 +108,10 @@ class DrawSudoku:
                 continue
             return key
 
-    def _draw_back_mask(self, back_mask, color):
+    def _draw_back_mask(self, back_mask, colors):
         if back_mask is None:
             return
-        if len(back_mask.shape)!=3:
+        if not(len(back_mask.shape)==3 or len(back_mask.shape)==4):
             return
         draw = ImageDraw.Draw(self.img, "RGBA")
         back_mask = mask_to_np(back_mask)
@@ -109,15 +121,18 @@ class DrawSudoku:
                 cx, cy = self.cell_pos(x,y)
                 cell_hints = back_mask[y,x,:]
                 for j in range(9):
-                    if not cell_hints[j]:
+                    color_idx = round(cell_hints[j])
+                    if color_idx==0:
                         continue
                     sm_cx = cx + sc*(j%3)
                     sm_cy = cy + sc*(j//3)
-                    draw.rectangle((sm_cx+1, sm_cy+1, sm_cx+sc-2, sm_cy+sc-2), fill=color)
+                    draw.rectangle((sm_cx+1, sm_cy+1, sm_cx+sc-2, sm_cy+sc-2),
+                                   fill=colors[(color_idx-1)%len(colors)])
                     pass
         pass
 
-    def _draw_sudoku(self, sudoku, hints, use_prev_hints, prev_hints, prev_color, next_color, img=None):
+    def _draw_sudoku(self, sudoku, hints, use_prev_hints, prev_hints, prev_color, next_color, img=None,
+                     back_mask=None, back_mask_colors=None):
         def is_hints(cell_hints):
             is_resolved_ = False
             is_partial_ = False
@@ -139,8 +154,10 @@ class DrawSudoku:
             img = self.img
         self.make_grid(img)
 
-        offsety_big = -8
-        offsety_sm = -2
+        self._draw_back_mask(back_mask, back_mask_colors)
+
+        offsety_big = self.offsety_big
+        offsety_sm = self.offsety_sm
         d = ImageDraw.Draw(img, "RGB")
         for i in range(81):
             if sudoku is None:
@@ -218,7 +235,7 @@ class DrawSudoku:
                     store_prev_hints=True,
                     prev_intensity=192,
                     back_mask = None,
-                    back_mask_color = (100,255,100,128)
+                    back_mask_colors = [(255,100,100,128),(100,255,100,128)]
                     ):
         '''
         hints = это массив из 0 и 1. Всё что не ноль считаем единицей.
@@ -265,10 +282,11 @@ class DrawSudoku:
             chG = img1.getchannel('G')
             chB = Image.blend(img0.getchannel('B'), img1.getchannel('B'), 0.5)
             self.img = Image.merge("RGB", (chR, chG, chB))
+            self._draw_back_mask(back_mask, back_mask_colors)
         else:
-            self._draw_sudoku(sudoku, hints, use_prev_hints, prev_hints=get_prev_hints(0), prev_color=prev_color, next_color=next_color)
+            self._draw_sudoku(sudoku, hints, use_prev_hints, prev_hints=get_prev_hints(0), prev_color=prev_color, next_color=next_color,
+                              back_mask=back_mask, back_mask_colors=back_mask_colors)
 
-        self._draw_back_mask(back_mask, back_mask_color)
         if not (self.store_all_images is None):
             self.store_all_images.append(self.img.copy())
 

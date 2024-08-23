@@ -17,12 +17,12 @@ from sudoku_stuff import *
 #sudoku = b"864371259325849761971265843436192587198657432257483916689734125713528694542916378" #valid
 #sudoku = b"22.371259325849761971265843436192587198657432257483916689734125713528694542916378" #invalid
 
-#sudoku = get_puzzle("data/puzzles0_kaggle")
+#sudoku = get_puzzle("data/puzzles0_kaggle", 275)
 #sudoku = get_puzzle("data/puzzles2_17_clue", 0)
 #sudoku = get_puzzle("data/puzzles1_unbiased", 2) #можно как hardest использовать не особо сложные
-#sudoku = get_puzzle("data/puzzles5_forum_hardest_1905_11+", 8) #3 решалось огроменное количество шагов, пришлось улучшить SudokuSolved распознавание invalid
-sudoku = get_puzzle("data/puzzles7_serg_benchmark", 5)
-#sudoku = get_puzzle("data/puzzles3_magictour_top1465", 30) #easy 4 30
+#sudoku = get_puzzle("data/puzzles5_forum_hardest_1905_11+", 3) #3 решалось огроменное количество шагов, пришлось улучшить SudokuSolved распознавание invalid
+#sudoku = get_puzzle("data/puzzles7_serg_benchmark", 8) #5 - easy
+sudoku = get_puzzle("data/puzzles3_magictour_top1465", 30) #easy 4 30
 
 #https://www.google.com/search?newwindow=1&client=ubuntu-sn&hs=rzG&sca_esv=e3ff2cacd83f1ace&channel=fs&sxsrf=ADLYWIK_uox5MzPdr9OSkR06N62CrL8Crg:1722364908241&q=Fastest+algorithm+to+solve+Sudoku&uds=ADvngMjvPWL3d2w2-NRjpDFznBOP8WBJNS0ErgI6af4zFntGhDeoodfxks_hG3knjbM5AAeRyq7yXMXaK2WdmMWDuQ-0Q4zNwaO43WVGyBAwF4OQv5JwtX-VFSpSPQS7kcVJAMYhYIK4zJGKcD0qtb59Eb4FufsgKg&sa=X&ved=2ahUKEwj1052ktc-HAxUWPxAIHZ6RGUMQxKsJegQIGhAB&ictx=0&biw=2490&bih=1328&dpr=1#fpstate=ive&vld=cid:592ceb4d,vid:gP5M1EoQe-4,st:0
 #sudoku = b'.....6.7..5..8.6933.......2..9..1.4...25.38...7.6..2..6.......5543.6..8..9.1.....' #easy
@@ -30,4 +30,6 @@ sudoku = get_puzzle("data/puzzles7_serg_benchmark", 5)
 #sudoku = b'004300209005009001070060043006002087190007400050083000600000105003508690042910300' #1 million
 #sudoku = get_puzzle_csv(max_count=1000)[13]
 
-solve_interactive(sudoku)
+#solve_interactive(sudoku)
+#solve_interactive(sudoku, enable_doubles=True, enable_recursion=False, draw_all_changes=True)
+solve_interactive(sudoku, draw_witout_press_key=True, draw_all_changes=False) #draw and save gif
