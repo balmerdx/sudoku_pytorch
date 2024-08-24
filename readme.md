@@ -139,5 +139,4 @@ tdoku на puzzles2_17_clue выдаёт 400162 puzzles/sec и решает 100%
 
 Ну и напоследок, для тех кто дочитал - видео решения ооочень долгого судоку.
 
-readme/puzzles5_forum_hardest_1905_11+3.mp4
-
+https://github.com/balmerdx/sudoku_pytorch/raw/master/readme/puzzles5_forum_hardest_1905_11_3.mp4

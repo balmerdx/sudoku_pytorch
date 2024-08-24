@@ -1,6 +1,5 @@
 tmp
 results
-*\.png
 out.gif
 gif_to_mp4.sh
 store_sudoku_arrays
